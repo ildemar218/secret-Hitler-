@@ -14,6 +14,21 @@
       {{ notification.message }}
     </div>
 
+    <div v-if="showPowerModal" class="power-modal-container">
+      <PowerModal
+        :visible="showPowerModal"
+        :power="selectedPower"
+        :players="players"
+        :selectedPlayer="selectedPlayer"
+        :president="currentPresident"
+        :chancellor="currentChancellor"
+        :currentPlayer="currentPlayer"
+        @close="closePowerModal"
+        @confirm="handleConfirm"
+        @select="handleSelect"
+      />
+    </div>
+
     <!-- Contenedor de Jugadores -->
     <div class="players-container mb-4">
       <div v-if="players.length > 0">
@@ -186,6 +201,7 @@ import LiberalCard from "../components/LiberalCard.vue";
 import { onSnapshotSubcollection, updateDocument, createSubCollection, enrichDataWithField, readSubcollection, readDocumentById, onSnapshotDocument, updateSubcollectionDocument } from "../firebase/servicesFirebase"; // Importación de función para escuchar cambios
 import { AuthService } from '../firebase/auth.js';
 import { writeBatch, doc } from "firebase/firestore";
+import PowerModal from '../components/PowerModal.vue'
 
 export default {
   props: ["codigoSala"],
@@ -195,6 +211,7 @@ export default {
     PresidentCansillerSelector,
     FascistCard,
     LiberalCard,
+    PowerModal,
   },
   setup(props) {
     const notification = ref({ message: "", type: "" });
@@ -213,7 +230,10 @@ export default {
     const showFascistPower = ref(false); // Mostrar poderes fascistas
     const currentUser = ref(null);
     const gameStarted = ref(false); // Bandera para evitar múltiples inicios
-
+    const showPowerModal = ref(true)
+    const selectedPower = ref('veto-president') // 'execution', 'identity', etc.
+    const selectedPlayer = ref(null)
+    const currentPlayer = ref({ id: 'user123', name: 'Jugador Prueba', rol: 'liberal' }) // ya debes tener esto
     // Escuchar jugadores en tiempo real y sincronizar estado local con Firebase
     onMounted(async () => {
       try {
@@ -621,6 +641,33 @@ export default {
       }
     };
 
+    function openPowerModal(powerType) {
+      selectedPower.value = powerType
+      showPowerModal.value = true
+    }
+
+    function closePowerModal() {
+      showPowerModal.value = false
+      selectedPower.value = ''
+      selectedPlayer.value = null
+    }
+
+    function handleSelect(player) {
+      selectedPlayer.value = player
+    }
+
+    function handleConfirm(payload) {
+      // Aquí ejecutas la acción según el poder.
+      if (selectedPower.value === 'execution') {
+        // Ejecutar jugador
+        ejecutarJugador(payload.id)
+      } else if (selectedPower.value === 'identity') {
+        revelarRol(payload.id)
+      } // etc.
+
+      closePowerModal()
+    }
+
     if (electionTracker < 0 || electionTracker > 3) {
       console.error("Valor inválido para electionTracker:", electionTracker);
     }
@@ -660,6 +707,13 @@ export default {
     handlePresidentPolicySelection,
     handleChancellorPolicySelection,
     selectRandomPresident,
+    showPowerModal,
+    selectedPower,
+    selectedPlayer,
+    currentPlayer,
+    closePowerModal,
+    handleSelect,
+    handleConfirm,
   };
   },
 };
@@ -747,5 +801,14 @@ export default {
 .player-role {
   font-size: 0.7rem; /* Reduce el tamaño del texto */
   color: #666;
+}
+
+.power-modal-container{
+ position: absolute;
+ top: 50%;
+ left: 50%;
+ transform: translate(-50%, 50%);
+ z-index: 50;
+ width: 70%;
 }
 </style>
