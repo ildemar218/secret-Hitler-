@@ -40,11 +40,11 @@
 
     <!-- Selector de Canciller -->
     <PresidentCansillerSelector
-      v-if="showChancellorSelector && currentPresident && currentPresident.id === currentUser?.id"
-      :players="players.filter(p => p.id !== currentPresident.id && p.esta_vivo)"
-      :presidentId="currentPresident?.id"
-      @chancellor-selected="handleChancellorSelected"
-    />
+  v-if="showChancellorSelector"
+  :players="players.filter(p => p.id !== currentPresident?.id && p.esta_vivo)"
+  :presidentId="currentPresident?.id"
+  @chancellor-selected="handleChancellorSelected"
+/>
 
     <!-- Tablero Liberal -->
     <div class="mb-4">
@@ -163,40 +163,66 @@ export default {
         );
 
         // Escuchar cambios en el estado de la partida
+        let previousPresidentId = null;
+
         const unsubscribeGame = onSnapshotDocument("partidas", props.codigoSala, (partida) => {
-          console.log("Datos de la partida:", partida);
-          if (partida) {
-            fascistProgress.value = partida.fascistProgress || 0;
-            electionTracker.value = partida.electionTracker || 0;
+  console.log("[🔄 Snapshot] Datos actualizados de la partida:", partida);
 
-            // Actualizar el presidente actual basado en turnoJugadorId y turnoActual
-            if (partida.turnoJugadorId) {
-              const president = players.value.find(player => player.id === partida.turnoJugadorId);
-              if (president && (!currentPresident.value || currentPresident.value.id !== president.id)) {
-                currentPresident.value = president;
-                notification.value = { 
-                  message: `¡${president.nombre} es el Presidente actual!`, 
-                  type: "info" 
-                };
-                // Solo mostrar el selector de canciller si el usuario actual es el presidente
-                showChancellorSelector.value = currentUser.value?.id === president.id;
-              }
-            }
+  if (!partida) return;
 
-            if (partida.id_canciller) {
-              const chancellor = players.value.find(player => player.id === partida.id_canciller);
-              currentChancellor.value = chancellor || null;
-              showChancellorSelector.value = false; // Ocultar el selector cuando se selecciona un canciller
-            }
+  fascistProgress.value = partida.fascistProgress || 0;
+  electionTracker.value = partida.electionTracker || 0;
 
-            // Solo iniciar la partida si está en estado "iniciada" y no se ha iniciado previamente
-            if (partida.estado === "iniciada" && !gameStarted.value) {
-              console.log("Iniciando la partida...");
-              gameStarted.value = true;
-              startGame();
-            }
-          }
-        });
+  // Detectar cambio de presidente
+  console.log(`[🧠 Depuración] id_presidente actual: ${partida.id_presidente}, id anterior: ${previousPresidentId}`);
+  
+  if (partida.id_presidente && partida.id_presidente !== previousPresidentId) {
+    console.log("[⚡ Cambio detectado] Se actualizó el presidente.");
+    previousPresidentId = partida.id_presidente;
+
+    const president = players.value.find(player => player.id === partida.id_presidente);
+
+    if (president) {
+      console.log(`[👔 Presidente asignado] ${president.nombre} (${president.id})`);
+      currentPresident.value = president;
+
+      notification.value = {
+        message: `¡${president.nombre} es el Presidente actual!`,
+        type: "info"
+      };
+
+
+      console.log("Current playeR: ", currentUser.value);
+
+      // Mostrar el selector solo si el jugador actual es el presidente
+      const esPresidenteActual = currentUser.value.id === president.id;
+      console.log(`[🔍 Usuario actual es presidente: ${esPresidenteActual}]`);
+
+      // Mostrar el selector de canciller solo si el usuario actual es presidente
+      showChancellorSelector.value = esPresidenteActual;
+      console.log(`[🔔 showChancellorSelector: ${showChancellorSelector.value}]`);
+    } else {
+      console.warn(`[⚠️ No se encontró el jugador con ID ${partida.id_presidente}]`);
+    }
+  }
+
+  // Solo actualizamos visualmente el canciller, pero no cerramos el selector aquí
+  if (partida.id_canciller) {
+    console.log(`[ℹ️ Info] Ya hay un canciller asignado con ID: ${partida.id_canciller}`);
+    const chancellor = players.value.find(player => player.id === partida.id_canciller);
+    currentChancellor.value = chancellor || null;
+  }
+
+  if (partida.estado === "iniciada" && !gameStarted.value) {
+    console.log("[🎮 Partida iniciada]");
+    gameStarted.value = true;
+    startGame();
+  }
+});
+
+
+
+
 
         return () => {
           unsubscribePlayers();
@@ -387,6 +413,8 @@ export default {
 
     const finalizarPresidencia = async () => {
       try {
+        console.log("[🛑 Finalizando presidencia...]");
+
         // Verificar que el usuario actual es el presidente
         if (!currentPresident.value || currentPresident.value.id !== currentUser.value?.id) {
           notification.value = { 
@@ -398,38 +426,58 @@ export default {
 
         // Ordenar jugadores por ordenTurno
         const sortedPlayers = [...players.value].sort((a, b) => a.ordenTurno - b.ordenTurno);
-        
-        // Encontrar el índice del presidente actual
-        const currentTurno = currentPresident.value.ordenTurno;
-        const nextTurno = currentTurno % sortedPlayers.length + 1;
-        
-        // Encontrar el siguiente presidente por ordenTurno
-        const nextPresident = sortedPlayers.find(p => p.ordenTurno === nextTurno);
+        const totalJugadores = sortedPlayers.length;
+        console.log(`[🔢 Jugadores ordenados]: ${sortedPlayers.map(p => `${p.nombre} (${p.ordenTurno})`).join(", ")}`);
+        console.log(`[📊 Total de jugadores]: ${totalJugadores}`);
 
+        // Obtener el turno del presidente actual
+        const currentTurno = currentPresident.value.ordenTurno;
+        console.log(`[👔 Turno actual del presidente]: ${currentTurno}`);
+
+        // Calcular el próximo turno, reiniciando a 1 si se excede
+        let nextTurno = currentTurno + 1;
+        if (nextTurno > totalJugadores) {
+          nextTurno = 1;
+          console.log("[🔁 Reinicio de turno] Se reinicia a 1");
+        } else {
+          console.log(`[➡️ Próximo turno calculado]: ${nextTurno}`);
+        }
+
+        // Buscar al siguiente presidente
+        const nextPresident = sortedPlayers.find(p => p.ordenTurno === nextTurno);
         if (!nextPresident) {
-          console.error("No se pudo encontrar el siguiente presidente.");
+          console.error("❌ No se pudo encontrar el siguiente presidente.");
           return;
         }
 
-        // Actualizar el turnoJugadorId en la partida
+        console.log(`[✅ Nuevo presidente]: ${nextPresident.nombre} (${nextPresident.id})`);
+
+        // Actualizar currentPresident con el nuevo presidente
+        currentPresident.value = nextPresident;
+        console.log(`[🔄 Presidente actualizado]: ${currentPresident.value.nombre} (${currentPresident.value.id})`);
+
+        // Actualizar la partida en Firebase
         await updateDocument("partidas", props.codigoSala, {
           turnoJugadorId: nextPresident.id,
           turnoActual: nextTurno
         });
 
-        console.log("Siguiente presidente:", nextPresident);
-        notification.value = { 
-          message: `¡${nextPresident.nombre} es el nuevo Presidente!`, 
-          type: "info" 
+        console.log(`[📥 Firebase actualizado] turnoJugadorId: ${nextPresident.id}, turnoActual: ${nextTurno}`);
+
+        notification.value = {
+          message: `¡${nextPresident.nombre} es el nuevo Presidente!`,
+          type: "info"
         };
 
         // Ocultar el selector de canciller
         showChancellorSelector.value = false;
+        console.log("[🙈 Selector de canciller ocultado]");
+
       } catch (error) {
-        console.error("Error al finalizar presidencia:", error);
-        notification.value = { 
-          message: "Error al finalizar la presidencia", 
-          type: "danger" 
+        console.error("❗ Error al finalizar presidencia:", error);
+        notification.value = {
+          message: "Error al finalizar la presidencia",
+          type: "danger"
         };
       }
     };
