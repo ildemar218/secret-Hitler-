@@ -36,7 +36,13 @@
           v-for="player in players"
           :key="player.id"
           :nombre="player.nombre"
-          :rol="player.id === currentPresident?.id ? 'Presidente' : player.id === currentChancellor?.id ? 'Canciller' : player.rol"
+          :rol="
+            player.id === currentPresident?.id
+              ? 'Presidente'
+              : player.id === currentChancellor?.id
+              ? 'Canciller'
+              : player.rol
+          "
           :imagen="player.imagen"
         />
       </div>
@@ -54,7 +60,11 @@
 
     <!-- Selector de Canciller -->
     <PresidentCansillerSelector
-      v-if="showChancellorSelector && currentPresident && currentPresident.id === currentUser?.id"
+      v-if="
+        showChancellorSelector &&
+        currentPresident &&
+        currentPresident.id === currentUser?.id
+      "
       :players="players"
       :presidentId="currentPresident?.id"
       @chancellor-selected="handleChancellorSelected"
@@ -64,7 +74,7 @@
           <h3>Selecciona un Canciller</h3>
           <ul>
             <li
-              v-for="player in players.filter(p => p.id !== presidentId)"
+              v-for="player in players.filter((p) => p.id !== presidentId)"
               :key="player.id"
             >
               <button @click="$emit('chancellor-selected', player)">
@@ -76,21 +86,29 @@
       </template>
     </PresidentCansillerSelector>
 
+    <LiberalBoard />
+    <FascistBoard playerCount="9" />
+
     <!-- Tablero Liberal -->
-    <div class="mb-4">
+    <!-- <div class="mb-4">
       <div class="d-flex justify-content-center">
         <LiberalCard
           :passedPolicies="liberalProgress"
           :trackerPosition="electionTracker"
         />
       </div>
-    </div>
+    </div> -->
 
     <!-- Tablero Fascista -->
-    <div class="mb-4">
+    <!-- <div class="mb-4">
       <div class="d-flex justify-content-center">
         <FascistCard
-          v-if="fascistProgress >= 0 && fascistProgress <= 6 && electionTracker >= 0 && electionTracker <= 3"
+          v-if="
+            fascistProgress >= 0 &&
+            fascistProgress <= 6 &&
+            electionTracker >= 0 &&
+            electionTracker <= 3
+          "
           :passedPolicies="fascistProgress"
           :trackerPosition="electionTracker"
           :currentPlayerCount="numPlayers"
@@ -115,7 +133,7 @@
           Ver Próximas Políticas
         </button>
       </div>
-    </div>
+    </div> -->
 
     <!-- Controles del Juego -->
     <div class="game-controls mt-4">
@@ -146,7 +164,9 @@
               v-for="(policy, index) in drawnPolicies"
               :key="index"
               class="btn policy-card mx-2"
-              :class="policy.tipo_carta === 'fascista' ? 'btn-danger' : 'btn-primary'"
+              :class="
+                policy.tipo_carta === 'fascista' ? 'btn-danger' : 'btn-primary'
+              "
               @click="handlePresidentPolicySelection(policy.tipo_carta)"
             >
               {{ policy.tipo_carta === "fascista" ? "Fascista" : "Liberal" }}
@@ -167,7 +187,9 @@
               v-for="(policy, index) in politicasParaCanciller"
               :key="index"
               class="btn policy-card mx-2"
-              :class="policy.tipo_carta === 'fascista' ? 'btn-danger' : 'btn-primary'"
+              :class="
+                policy.tipo_carta === 'fascista' ? 'btn-danger' : 'btn-primary'
+              "
               @click="handleChancellorPolicySelection(policy.tipo_carta)"
             >
               {{ policy.tipo_carta === "fascista" ? "Fascista" : "Liberal" }}
@@ -186,7 +208,9 @@
             : "¡Los Fascistas han ganado!"
         }}
       </h2>
-      <button class="btn btn-info mt-3" @click="resetGame">Nueva Partida</button>
+      <button class="btn btn-info mt-3" @click="resetGame">
+        Nueva Partida
+      </button>
     </div>
   </div>
 </template>
@@ -198,10 +222,21 @@ import DecksEndTermButton from "../components/DecksEndTermButton.vue";
 import PresidentCansillerSelector from "../components/PresidentCansillerSelector.vue";
 import FascistCard from "../components/FascistCard.vue";
 import LiberalCard from "../components/LiberalCard.vue";
-import { onSnapshotSubcollection, updateDocument, createSubCollection, enrichDataWithField, readSubcollection, readDocumentById, onSnapshotDocument, updateSubcollectionDocument } from "../firebase/servicesFirebase"; // Importación de función para escuchar cambios
-import { AuthService } from '../firebase/auth.js';
+import {
+  onSnapshotSubcollection,
+  updateDocument,
+  createSubCollection,
+  enrichDataWithField,
+  readSubcollection,
+  readDocumentById,
+  onSnapshotDocument,
+  updateSubcollectionDocument,
+} from "../firebase/servicesFirebase"; // Importación de función para escuchar cambios
+import { AuthService } from "../firebase/auth.js";
 import { writeBatch, doc } from "firebase/firestore";
 import PowerModal from '../components/PowerModal.vue'
+import FascistBoard from "../components/FascistBoard.vue";
+import LiberalBoard from "../components/LiberalBoard.vue";
 
 export default {
   props: ["codigoSala"],
@@ -212,10 +247,12 @@ export default {
     FascistCard,
     LiberalCard,
     PowerModal,
+    FascistBoard,
+    LiberalBoard,
   },
   setup(props) {
     const notification = ref({ message: "", type: "" });
-    const players = ref([]); // Lista de jugadores
+    // const players = ref([]); // Lista de jugadores
     const showChancellorSelector = ref(false);
     const fascistProgress = ref(0);
     const liberalProgress = ref(0);
@@ -224,8 +261,8 @@ export default {
     const drawnPolicies = ref([]);
     const showPolicyModal = ref(false);
     const politicasParaCanciller = ref([]);
-    const currentPresident = ref({ id: null, nombre: null });
-    const currentChancellor = ref(null);
+    // const currentPresident = ref({ id: null, nombre: null });
+    // const currentChancellor = ref(null);
     const numPlayers = computed(() => players.value.length); // Número de jugadores
     const showFascistPower = ref(false); // Mostrar poderes fascistas
     const currentUser = ref(null);
@@ -234,6 +271,43 @@ export default {
     const selectedPower = ref('veto-president') // 'execution', 'identity', etc.
     const selectedPlayer = ref(null)
     const currentPlayer = ref({ id: 'user123', name: 'Jugador Prueba', rol: 'liberal' }) // ya debes tener esto
+
+    const players = ref([
+      {
+        id: 1,
+        nombre: "Juan Pérez",
+        rol: "Liberal",
+        imagen: "https://via.placeholder.com/100",
+      },
+      {
+        id: 2,
+        nombre: "María Gómez",
+        rol: "Fascista",
+        imagen: "https://via.placeholder.com/100",
+      },
+      {
+        id: 3,
+        nombre: "Luis Ramírez",
+        rol: "Hitler",
+        imagen: "https://via.placeholder.com/100",
+      },
+      {
+        id: 4,
+        nombre: "Ana Torres",
+        rol: "Liberal",
+        imagen: "https://via.placeholder.com/100",
+      },
+      {
+        id: 5,
+        nombre: "Carlos Díaz",
+        rol: "Fascista",
+        imagen: "https://via.placeholder.com/100",
+      },
+    ]);
+
+    const currentPresident = ref(players.value[1]); // María Gómez
+    const currentChancellor = ref(players.value[4]); // Carlos Díaz
+
     // Escuchar jugadores en tiempo real y sincronizar estado local con Firebase
     onMounted(async () => {
       try {
@@ -253,38 +327,56 @@ export default {
               rol: jugador.rol,
               esta_vivo: jugador.esta_vivo,
               conectado: jugador.conectado,
-              imagen: jugador.imagen || '/public/image.png', // Imagen por defecto si no tiene una
+              imagen: jugador.imagen || "/public/image.png", // Imagen por defecto si no tiene una
             }));
 
             players.value = updatedPlayers;
-            console.log("Jugadores actualizados desde la base de datos:", players.value);
+            console.log(
+              "Jugadores actualizados desde la base de datos:",
+              players.value
+            );
           }
         );
 
-        const unsubscribeGame = onSnapshotDocument("partidas", props.codigoSala, (partida) => {
-          console.log("Datos de la partida:", partida);
-          if (partida) {
-            fascistProgress.value = partida.fascistProgress || 0;
-            electionTracker.value = partida.electionTracker || 0;
+        const unsubscribeGame = onSnapshotDocument(
+          "partidas",
+          props.codigoSala,
+          (partida) => {
+            console.log("Datos de la partida:", partida);
+            if (partida) {
+              fascistProgress.value = partida.fascistProgress || 0;
+              electionTracker.value = partida.electionTracker || 0;
 
-            if (partida.id_presidente) {
-              const president = players.value.find(player => player.id === partida.id_presidente);
-              currentPresident.value = president || { id: null, nombre: null }; // Valor por defecto si no se encuentra
-            }
+              if (partida.id_presidente) {
+                const president = players.value.find(
+                  (player) => player.id === partida.id_presidente
+                );
+                currentPresident.value = president || {
+                  id: null,
+                  nombre: null,
+                }; // Valor por defecto si no se encuentra
+              }
 
-            if (partida.id_canciller) {
-              const chancellor = players.value.find(player => player.id === partida.id_canciller);
-              currentChancellor.value = chancellor || null; // Valor por defecto si no se encuentra
-            }
+              if (partida.id_canciller) {
+                const chancellor = players.value.find(
+                  (player) => player.id === partida.id_canciller
+                );
+                currentChancellor.value = chancellor || null; // Valor por defecto si no se encuentra
+              }
 
-            // Iniciar la partida si está en estado "iniciada" y no se ha iniciado previamente
-            if (players.value.length >= 5 && partida.estado === "iniciada" && !gameStarted.value) {
-              console.log("Iniciando la partida...");
-              gameStarted.value = true; // Marcar como iniciado
-              startGame();
+              // Iniciar la partida si está en estado "iniciada" y no se ha iniciado previamente
+              if (
+                players.value.length >= 5 &&
+                partida.estado === "iniciada" &&
+                !gameStarted.value
+              ) {
+                console.log("Iniciando la partida...");
+                gameStarted.value = true; // Marcar como iniciado
+                startGame();
+              }
             }
           }
-        });
+        );
 
         return () => {
           unsubscribePlayers();
@@ -292,7 +384,11 @@ export default {
         };
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -327,7 +423,11 @@ export default {
         showPolicyModal.value = true; // Mostrar el modal de selección
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -350,7 +450,11 @@ export default {
         await checkGameOver();
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -365,18 +469,28 @@ export default {
             estado: "finalizada",
             ganador: "fascistas",
           });
-          notification.value = { message: "¡Los Fascistas han ganado!", type: "danger" };
+          notification.value = {
+            message: "¡Los Fascistas han ganado!",
+            type: "danger",
+          };
         } else if (liberalProgress.value >= 5) {
           isGameOver.value = true;
           await updateDocument("partidas", props.codigoSala, {
             estado: "finalizada",
             ganador: "liberales",
           });
-          notification.value = { message: "¡Los Liberales han ganado!", type: "success" };
+          notification.value = {
+            message: "¡Los Liberales han ganado!",
+            type: "success",
+          };
         }
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -395,10 +509,17 @@ export default {
         fascistProgress.value = 0;
         liberalProgress.value = 0;
         isGameOver.value = false;
-        notification.value = { message: "La partida ha sido reiniciada.", type: "info" };
+        notification.value = {
+          message: "La partida ha sido reiniciada.",
+          type: "info",
+        };
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -420,10 +541,17 @@ export default {
         console.log("Canciller seleccionado:", chancellor);
 
         showChancellorSelector.value = false; // Ocultar el selector de canciller
-        notification.value = { message: `¡${chancellor.nombre} ha sido nominado como Canciller!`, type: "info" };
+        notification.value = {
+          message: `¡${chancellor.nombre} ha sido nominado como Canciller!`,
+          type: "info",
+        };
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -432,18 +560,27 @@ export default {
 
     const handlePresidentPolicySelection = async (selectedPolicy) => {
       try {
-        const remainingPolicies = drawnPolicies.value.filter(policy => policy.tipo_carta !== selectedPolicy);
+        const remainingPolicies = drawnPolicies.value.filter(
+          (policy) => policy.tipo_carta !== selectedPolicy
+        );
 
         await updateDocument("partidas", props.codigoSala, {
           politicas_para_canciller: remainingPolicies,
         });
 
         politicasParaCanciller.value = remainingPolicies;
-        notification.value = { message: "El Canciller debe seleccionar una política.", type: "info" };
+        notification.value = {
+          message: "El Canciller debe seleccionar una política.",
+          type: "info",
+        };
         showPolicyModal.value = false;
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -466,10 +603,17 @@ export default {
         await checkGameOver();
 
         politicasParaCanciller.value = [];
-        notification.value = { message: `¡Se ha promulgado una política ${selectedPolicy}!`, type: "success" };
+        notification.value = {
+          message: `¡Se ha promulgado una política ${selectedPolicy}!`,
+          type: "success",
+        };
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -488,8 +632,10 @@ export default {
 
         currentPresident.value = selectedPresident;
 
-        players.value = players.value.map(player =>
-          player.id === selectedPresident.id ? { ...player, rol: "presidente" } : player
+        players.value = players.value.map((player) =>
+          player.id === selectedPresident.id
+            ? { ...player, rol: "presidente" }
+            : player
         );
 
         await updateDocument("partidas", props.codigoSala, {
@@ -498,7 +644,10 @@ export default {
 
         console.log("Presidente seleccionado:", selectedPresident);
 
-        notification.value = { message: `¡${selectedPresident.nombre} es el Presidente!`, type: "info" };
+        notification.value = {
+          message: `¡${selectedPresident.nombre} es el Presidente!`,
+          type: "info",
+        };
         showChancellorSelector.value = true;
       } catch (error) {
         console.error("Error al seleccionar presidente:", error);
@@ -525,10 +674,16 @@ export default {
             if (totalVotes === players.value.length - 1) {
               // Todos los jugadores han votado
               if (yesVotes > Math.floor(players.value.length / 2)) {
-                notification.value = { message: "¡El Canciller ha sido aprobado!", type: "success" };
+                notification.value = {
+                  message: "¡El Canciller ha sido aprobado!",
+                  type: "success",
+                };
                 startPolicySelection(); // Iniciar la selección de políticas
               } else {
-                notification.value = { message: "El Canciller ha sido rechazado.", type: "danger" };
+                notification.value = {
+                  message: "El Canciller ha sido rechazado.",
+                  type: "danger",
+                };
                 resetTurn(); // Reiniciar el turno
               }
             }
@@ -538,7 +693,11 @@ export default {
         return () => unsubscribe(); // Cancelar la suscripción al desmontar
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -555,10 +714,19 @@ export default {
           fecha_inicio: new Date().toISOString(),
           fecha_fin: null,
         };
-        await createSubCollection("partidas", props.codigoSala, "turnos", turnoData);
+        await createSubCollection(
+          "partidas",
+          props.codigoSala,
+          "turnos",
+          turnoData
+        );
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -576,7 +744,11 @@ export default {
         );
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -586,7 +758,10 @@ export default {
     const assignRoles = async () => {
       try {
         if (players.value.length !== 5) {
-          notification.value = { message: "La partida requiere exactamente 5 jugadores.", type: "danger" };
+          notification.value = {
+            message: "La partida requiere exactamente 5 jugadores.",
+            type: "danger",
+          };
           return;
         }
 
@@ -597,7 +772,13 @@ export default {
         for (let i = 0; i < players.value.length; i++) {
           const player = players.value[i];
           const role = shuffledRoles[i];
-          const playerDocRef = doc(db, "partidas", props.codigoSala, "jugadores", player.id);
+          const playerDocRef = doc(
+            db,
+            "partidas",
+            props.codigoSala,
+            "jugadores",
+            player.id
+          );
 
           batch.update(playerDocRef, { rol: role }); // Add update to batch
           players.value[i] = { ...player, rol: role }; // Update local state
@@ -607,7 +788,11 @@ export default {
         console.log("Roles asignados:", players.value);
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -617,7 +802,10 @@ export default {
     const startGame = async () => {
       try {
         if (players.value.length !== 5) {
-          notification.value = { message: "La partida requiere exactamente 5 jugadores.", type: "danger" };
+          notification.value = {
+            message: "La partida requiere exactamente 5 jugadores.",
+            type: "danger",
+          };
           return;
         }
 
@@ -634,7 +822,11 @@ export default {
         await selectRandomPresident(); // Seleccionar al presidente
       } catch (error) {
         if (error.code === "resource-exhausted") {
-          notification.value = { message: "Se ha excedido el límite de Firestore. Inténtalo más tarde.", type: "danger" };
+          notification.value = {
+            message:
+              "Se ha excedido el límite de Firestore. Inténtalo más tarde.",
+            type: "danger",
+          };
         } else {
           console.error("Error:", error);
         }
@@ -675,8 +867,8 @@ export default {
       console.error("Valor inválido para fascistProgress:", fascistProgress);
     }
 
-    console.log('fascistProgress:', fascistProgress.value);
-    console.log('electionTracker:', electionTracker.value);
+    console.log("fascistProgress:", fascistProgress.value);
+    console.log("electionTracker:", electionTracker.value);
 
     watch(players, (newVal) => {
       console.log("Lista de jugadores actualizada:", newVal);
@@ -715,6 +907,31 @@ export default {
     handleSelect,
     handleConfirm,
   };
+      notification,
+      players,
+      showChancellorSelector,
+      fascistProgress,
+      liberalProgress,
+      electionTracker,
+      isGameOver,
+      politicas,
+      drawnPolicies,
+      showPolicyModal,
+      politicasParaCanciller,
+      currentPresident,
+      currentChancellor,
+      numPlayers,
+      showFascistPower,
+      currentUser,
+      handleFascistEffect,
+      drawPolicies,
+      enactPolicy,
+      resetGame,
+      handleChancellorSelected,
+      handlePresidentPolicySelection,
+      handleChancellorPolicySelection,
+      selectRandomPresident,
+    };
   },
 };
 </script>
