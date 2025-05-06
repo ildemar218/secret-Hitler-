@@ -4,15 +4,10 @@
     style="max-width: 1400px; margin: 0 auto"
   >
     <!-- Área de notificaciones -->
-    <div
-      v-if="notification.message"
-      :class="[
-        'alert',
-        notification.type === 'success' ? 'alert-success' : 'alert-danger',
-      ]"
-    >
-      {{ notification.message }}
-    </div>
+    <NotificationArea
+      :message="notification.message"
+      :type="notification.type"
+    />
 
     <!-- Contenedor de Jugadores -->
     <div class="players-container mb-4">
@@ -49,27 +44,7 @@
       :players="players.filter(p => p.id !== currentPresident.id && p.esta_vivo)"
       :presidentId="currentPresident?.id"
       @chancellor-selected="handleChancellorSelected"
-    >
-      <template v-slot:default="{ players, presidentId }">
-        <div class="chancellor-selector">
-          <h3>Selecciona un Canciller</h3>
-          <div class="players-list">
-            <div 
-              v-for="player in players" 
-              :key="player.id"
-              class="player-option"
-            >
-              <button 
-                class="btn btn-outline-primary"
-                @click="$emit('chancellor-selected', player)"
-              >
-                {{ player.nombre }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
-    </PresidentCansillerSelector>
+    />
 
     <!-- Tablero Liberal -->
     <div class="mb-4">
@@ -92,85 +67,16 @@
           @policy-effect="handleFascistEffect"
         />
       </div>
-      <div v-if="showFascistPower" class="mt-3">
-        <h5>¡Poder Fascista Activado!</h5>
-        <p>{{ fascistPowerDescription }}</p>
-        <button
-          v-if="currentPower === 'investigate'"
-          class="btn btn-warning me-2"
-          @click="showPlayerInvestigation"
-        >
-          Investigar Jugador
-        </button>
-        <button
-          v-if="currentPower === 'policyPeek'"
-          class="btn btn-warning me-2"
-          @click="showPolicyPeek"
-        >
-          Ver Próximas Políticas
-        </button>
-      </div>
     </div>
 
-    <!-- Controles del Juego -->
-    <div class="game-controls mt-4">
-      <div class="mb-3">
-        <h4>Acciones Disponibles</h4>
-        <button
-          class="btn btn-primary me-2"
-          @click="drawPolicies"
-          :disabled="isGameOver || politicas.length < 3"
-        >
-          Robar Políticas ({{ politicas.length }} restantes)
-        </button>
-        <button
-          v-if="drawnPolicies.length > 0"
-          class="btn btn-success me-2"
-          @click="showPolicySelection"
-        >
-          Seleccionar Política a Promulgar
-        </button>
-      </div>
-
-      <!-- Selección de Política (modal) -->
-      <div v-if="showPolicyModal" class="policy-modal">
-        <div class="modal-content">
-          <h4>Selecciona una política para promulgar</h4>
-          <div class="d-flex justify-content-center my-3">
-            <button
-              v-for="(policy, index) in drawnPolicies"
-              :key="index"
-              class="btn policy-card mx-2"
-              :class="policy.tipo_carta === 'fascista' ? 'btn-danger' : 'btn-primary'"
-              @click="handlePresidentPolicySelection(policy.tipo_carta)"
-            >
-              {{ policy.tipo_carta === "fascista" ? "Fascista" : "Liberal" }}
-            </button>
-          </div>
-          <button class="btn btn-secondary" @click="showPolicyModal = false">
-            Cancelar
-          </button>
-        </div>
-      </div>
-
-      <!-- Selección de Política por Canciller -->
-      <div v-if="politicasParaCanciller.length > 0" class="policy-modal">
-        <div class="modal-content">
-          <h4>Selecciona una política para promulgar</h4>
-          <div class="d-flex justify-content-center my-3">
-            <button
-              v-for="(policy, index) in politicasParaCanciller"
-              :key="index"
-              class="btn policy-card mx-2"
-              :class="policy.tipo_carta === 'fascista' ? 'btn-danger' : 'btn-primary'"
-              @click="handleChancellorPolicySelection(policy.tipo_carta)"
-            >
-              {{ policy.tipo_carta === "fascista" ? "Fascista" : "Liberal" }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Área de Políticas -->
+    <PolicyArea
+      :politicas="politicas"
+      :is-game-over="isGameOver"
+      @draw-policies="drawPolicies"
+      @president-policy-selected="handlePresidentPolicySelection"
+      @chancellor-policy-selected="handleChancellorPolicySelection"
+    />
 
     <!-- Estado del Juego -->
     <div v-if="isGameOver" class="game-over mt-4">
@@ -193,6 +99,8 @@ import DecksEndTermButton from "../components/DecksEndTermButton.vue";
 import PresidentCansillerSelector from "../components/PresidentCansillerSelector.vue";
 import FascistCard from "../components/FascistCard.vue";
 import LiberalCard from "../components/LiberalCard.vue";
+import NotificationArea from "../components/NotificationArea.vue";
+import PolicyArea from "../components/PolicyArea.vue";
 import { onSnapshotSubcollection, updateDocument, createSubCollection, enrichDataWithField, readSubcollection, readDocumentById, onSnapshotDocument, updateSubcollectionDocument } from "../firebase/servicesFirebase"; // Importación de función para escuchar cambios
 import { AuthService } from '../firebase/auth.js';
 import { writeBatch, doc } from "firebase/firestore";
@@ -205,6 +113,8 @@ export default {
     PresidentCansillerSelector,
     FascistCard,
     LiberalCard,
+    NotificationArea,
+    PolicyArea
   },
   setup(props) {
     const notification = ref({ message: "", type: "" });
