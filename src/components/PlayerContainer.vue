@@ -33,6 +33,8 @@ defineProps({
   text-align: center;
   background-color: #f9f9f9;
   width: 120px; /* Tamaño fijo para las tarjetas */
+  margin: 0 10px; /* Espacio entre tarjetas */
+  display: inline-block; /* Para que las tarjetas se muestren en línea */
 }
 
 .player-image {
@@ -46,6 +48,9 @@ defineProps({
 .player-name {
   font-weight: bold;
   margin-bottom: 0.5rem;
+  white-space: nowrap; /* Evita que el nombre se rompa en múltiples líneas */
+  overflow: hidden; /* Oculta el texto que se desborde */
+  text-overflow: ellipsis; /* Muestra ... cuando el texto es muy largo */
 }
 
 .player-role {
@@ -57,7 +62,9 @@ defineProps({
   display: flex;
   flex-wrap: nowrap; /* No permite que los elementos se ajusten a la siguiente fila */
   justify-content: center;
-  gap: 0.5rem;
+  gap: 1rem; /* Espacio entre tarjetas */
   overflow-x: auto; /* Permite desplazamiento horizontal si hay desbordamiento */
+  padding: 1rem; /* Espacio alrededor del contenedor */
+  width: 100%; /* Ancho completo */
 }
 </style>

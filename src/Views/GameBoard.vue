@@ -11,7 +11,7 @@
 
     <!-- Contenedor de Jugadores -->
     <div class="players-container mb-4">
-      <div v-if="players.length > 0">
+      <div v-if="players.length > 0" class="d-flex justify-content-center">
         <PlayerContainer
           v-for="player in players"
           :key="player.id"
@@ -387,6 +387,15 @@ export default {
 
     const finalizarPresidencia = async () => {
       try {
+        // Verificar que el usuario actual es el presidente
+        if (!currentPresident.value || currentPresident.value.id !== currentUser.value?.id) {
+          notification.value = { 
+            message: "Solo el presidente actual puede finalizar la presidencia", 
+            type: "danger" 
+          };
+          return;
+        }
+
         // Ordenar jugadores por ordenTurno
         const sortedPlayers = [...players.value].sort((a, b) => a.ordenTurno - b.ordenTurno);
         
@@ -627,7 +636,7 @@ export default {
 
 <style scoped>
 .game-container {
-  max-width: 1400px; /* Ya está configurado en el template */
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -670,14 +679,10 @@ export default {
 }
 
 .players-container {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  overflow-x: auto;
   width: 100%;
+  overflow-x: auto;
+  padding: 1rem;
+  margin-bottom: 2rem;
 }
 
 .player-card {
