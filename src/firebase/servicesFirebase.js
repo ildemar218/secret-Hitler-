@@ -13,7 +13,10 @@ import {
   where,
   collectionGroup,
   writeBatch,
+  serverTimestamp
 } from "firebase/firestore";
+import { generateGameCode } from '../utils/gameCodeGenerator';
+import { assignRoles } from '../utils/roleAssigner';
 
 /**
  * Crear un documento en una subcolección dentro de una subcolección
@@ -43,41 +46,45 @@ export const createNestedSubcollectionDocument = async (
   }
 };
 
-
 /**
- * Crear una nueva partida con jugadores y configuraciones iniciales.
+ * Crear una nueva partida
+ * @param {Object} user - Usuario autenticado
+ * @returns {Promise<string>} Código de la partida
  */
-export const createGame = async (codigoSala, idHostUsuario, jugadores) => {
-  try {
-    // Crear la partida
-    const partidaData = {
-      codigo_sala: codigoSala,
-      id_host_usuario: idHostUsuario,
-      estado: "pendiente",
-      turno_actual: 0,
-      ganador: null,
-    };
-    await createDocument("partidas", partidaData, codigoSala);
-
-    // Agregar jugadores a la subcolección "jugadores"
-    for (let i = 0; i < jugadores.length; i++) {
-      const jugadorData = {
-        id_usuario: jugadores[i].id_usuario,
-        id_partida: codigoSala,
-        nombre: jugadores[i].nombre,
-        rol: jugadores[i].rol,
-        orden_turno: i + 1,
-        esta_vivo: true,
-        conectado: true,
-      };
-      await createSubCollection("partidas", codigoSala, "jugadores", jugadorData, jugadores[i].id_jugador);
+export const createGame = async (user) => {
+  if (!user) throw new Error('Usuario no autenticado');
+  
+  const gameCode = await generateGameCode();
+  
+  const gameData = {
+    codigo: gameCode,
+    estado: 'esperando',
+    creador: user.uid,
+    fechaCreacion: serverTimestamp(),
+    turnoJugadorId: null,
+    fallosGobierno: 0,
+    tableros: {
+      tableroLiberal: {
+        leyesLiberales: 0,
+        fallosLiberales: 0
+      },
+      tableroFascista: {
+        leyesFascistas: 0,
+        poderesFascistas: []
+      }
     }
+  };
 
-    console.log("Partida creada con éxito.");
-  } catch (error) {
-    console.error("Error al crear la partida:", error);
-    throw error;
-  }
+  await setDoc(doc(db, 'partidas', gameCode), gameData);
+  
+  // Añadir host como jugador
+  await addPlayer(gameCode, {
+    idJugador: user.uid,
+    nombreEnJuego: user.displayName || 'Jugador Anónimo',
+    esHost: true
+  });
+
+  return gameCode;
 };
 
 /**
@@ -103,7 +110,8 @@ export const createTurn = async (idPartida, numeroTurno, idPresidenteJugador) =>
 };
 
 /**
- * Inicializar las políticas en una partida.
+ * Inicializar las políticas en una partida
+ * @param {string} idPartida 
  */
 export const initializePolicies = async (idPartida) => {
   try {
@@ -124,10 +132,11 @@ export const initializePolicies = async (idPartida) => {
         id_turno: null,
         id_partida: idPartida,
       };
-      await createSubCollection("partidas", idPartida, "politicas", politicaData);
+      await setDoc(
+        doc(db, 'partidas', idPartida, 'politicas', `politica_${i + 1}`),
+        politicaData
+      );
     }
-
-    console.log("Políticas inicializadas con éxito.");
   } catch (error) {
     console.error("Error al inicializar las políticas:", error);
     throw error;
@@ -726,3 +735,131 @@ export const deleteDocumentFromSubcollection = async (
     throw e; // Recomendado para manejar el error donde se llame a la función
   }
 }; // <--- Único cierre necesario (cierra la función)
+
+/**
+ * Iniciar una partida existente
+ * @param {string} gameCode - Código de la partida
+ * @param {string} hostId - ID del usuario host
+ * @param {Array} players - Lista de jugadores
+ */
+export const startGame = async (gameCode, hostId, players) => {
+  if (players.length < 5) {
+    throw new Error('Se requieren mínimo 5 jugadores');
+  }
+
+  const batch = writeBatch(db);
+  const gameRef = doc(db, 'partidas', gameCode);
+  
+  // 1. Asignar roles
+  const roles = assignRoles(players.length);
+  
+  // Obtener los documentos actuales de los jugadores
+  const jugadoresRef = collection(db, 'partidas', gameCode, 'jugadores_partida');
+  const jugadoresSnapshot = await getDocs(jugadoresRef);
+  const jugadoresDocs = jugadoresSnapshot.docs;
+
+  // Actualizar cada jugador existente
+  for (let i = 0; i < players.length; i++) {
+    // Encontrar el documento del jugador por su idJugador
+    const jugadorDoc = jugadoresDocs.find(doc => doc.data().idJugador === players[i].idJugador);
+    if (!jugadorDoc) {
+      console.error(`No se encontró el documento para el jugador ${players[i].idJugador}`);
+      continue;
+    }
+
+    const playerRef = doc(db, 'partidas', gameCode, 'jugadores_partida', jugadorDoc.id);
+    batch.update(playerRef, {
+      rol: roles[i],
+      inclinacion: roles[i] === 'liberal' ? 'liberal' : 'fascista',
+      estaVivo: true,
+      ordenTurno: i + 1
+    });
+  }
+
+  // 2. Inicializar políticas
+  await initializePolicies(gameCode);
+
+  // 3. Actualizar estado de partida
+  batch.update(gameRef, {
+    estado: 'iniciada',
+    turnoJugadorId: hostId,
+    fechaInicio: serverTimestamp()
+  });
+
+  await batch.commit();
+};
+
+/**
+ * Obtener datos de una partida
+ * @param {string} gameCode 
+ * @returns {Promise<Object>}
+ */
+export const getGame = async (gameCode) => {
+  const snapshot = await getDoc(doc(db, 'partidas', gameCode));
+  return snapshot.exists() ? snapshot.data() : null;
+};
+
+/**
+ * Escuchar cambios en el estado de la partida
+ * @param {string} gameCode 
+ * @param {Function} callback 
+ */
+export const onGameStateChange = (gameCode, callback) => {
+  return onSnapshot(doc(db, 'partidas', gameCode), (snap) => {
+    if (snap.exists()) callback(snap.data());
+  });
+};
+
+/**
+ * Añadir un jugador a una partida
+ * @param {string} gameCode 
+ * @param {Object} playerData 
+ */
+export const addPlayer = async (codigoPartida, jugadorData) => {
+  try {
+    // Verificar si el jugador ya existe en la partida
+    const jugadoresRef = collection(db, "partidas", codigoPartida, "jugadores_partida");
+    const q = query(jugadoresRef, where("idJugador", "==", jugadorData.idJugador));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+      console.log("El jugador ya existe en la partida");
+      return null;
+    }
+
+    // Si el jugador no existe, añadirlo
+    const docRef = await addDoc(jugadoresRef, {
+      ...jugadorData,
+      fecha_union: serverTimestamp()
+    });
+
+    return docRef.id;
+  } catch (error) {
+    console.error("Error al añadir jugador:", error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener todos los jugadores de una partida
+ * @param {string} gameCode 
+ * @returns {Promise<Array>}
+ */
+export const getPlayers = async (gameCode) => {
+  const snapshot = await getDocs(
+    collection(db, 'partidas', gameCode, 'jugadores_partida')
+  );
+  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+/**
+ * Escuchar cambios en los jugadores de la partida
+ * @param {string} gameCode 
+ * @param {Function} callback 
+ */
+export const onPlayersChange = (gameCode, callback) => {
+  return onSnapshot(
+    collection(db, 'partidas', gameCode, 'jugadores_partida'),
+    (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+};

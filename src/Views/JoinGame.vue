@@ -16,7 +16,7 @@
           <button class="btn btn-success" @click="unirseAPartida" :disabled="esperandoInicio">
             {{ esperandoInicio ? "Esperando..." : "Unirse" }}
           </button>
-          <button class="btn btn-danger mt-2" @click="$router.push('/Home')">
+          <button class="btn btn-danger mt-2" @click="$router.push('/login')">
             Cancelar
           </button>
         </div>
@@ -39,6 +39,7 @@ import { useRouter } from "vue-router";
 import { AuthService } from '../firebase/auth.js';
 import { readDocumentById, queryDocuments, createSubCollection, onSnapshotDocument, readSubcollection } from "../firebase/servicesFirebase.js"
 import Swal from "sweetalert2";
+import { serverTimestamp } from "firebase/firestore";
 
 export default {
   setup() {
@@ -83,22 +84,19 @@ export default {
         const jugadoresSnap = await readSubcollection("partidas", partidaSnap.id, "jugadores_partida");
         console.log("jugadores", jugadoresSnap);
 
-        // Valida si la partida ya está iniciada
-        if (partidaSnap.estado === "finalizada") {
-          Swal.fire("Partida finalizada", "La partida ha finalizado. No puedes unirte en este momento.", "warning");
-          return;
-        }
         // Verifica si el jugador ya está registrado en la partida
         const isInGame = jugadoresSnap.some((jugador) => jugador.idJugador === uid);
-        console.log(isInGame)
-        if (isInGame && partidaSnap.estado === "iniciada") {
-          Swal.fire("Bienvenido de vuelta", "Ya estás registrado en esta partida.", "info");
-          router.push("/gameboard/" + partidaSnap.id);
-          return;
-        } else if (isInGame){
-          Swal.fire("Bienvenido de vuelta", "Ya estás registrado en esta partida, pero aún no ha empezado la partida.", "info");
-          mensaje.value = "Esperando que el anfitrión inicie...";
-          esperandoInicio.value = true;
+        console.log("¿Jugador ya está en la partida?", isInGame);
+        
+        if (isInGame) {
+          if (partidaSnap.estado === "iniciada") {
+            Swal.fire("Bienvenido de vuelta", "Ya estás registrado en esta partida.", "info");
+            router.push("/gameboard/" + partidaSnap.id);
+          } else {
+            Swal.fire("Bienvenido de vuelta", "Ya estás registrado en esta partida, pero aún no ha empezado la partida.", "info");
+            mensaje.value = "Esperando que el anfitrión inicie...";
+            esperandoInicio.value = true;
+          }
           return;
         }
 
@@ -109,17 +107,19 @@ export default {
         }
 
         // Valida si la partida ya está llena
-        if (jugadoresSnap.size >= 4) {
+        if (jugadoresSnap.length >= 10) {
           Swal.fire("Sala llena", "La sala ha alcanzado su capacidad máxima de jugadores.", "error");
           return;
         }
 
         // Añade al jugador como un documento en la subcolección "jugadores_partida"
-        await createSubCollection("partidas", codigoClean,"jugadores_partida", {
+        await createSubCollection("partidas", codigoClean, "jugadores_partida", {
           idJugador: uid,
           idPartida: partidaSnap.id,
+          nombreEnJuego: jugadorActual,
           host: false,
-          estadoUno: false
+          estadoUno: false,
+          fecha_union: serverTimestamp()
         });
 
         esperandoInicio.value = true;
