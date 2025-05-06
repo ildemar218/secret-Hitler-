@@ -1,9 +1,12 @@
 <template>
   <div class="player-card">
+    <div v-if="rol === 'canciller'" class="role-badge chancellor-badge">
+      Canciller
+    </div>
     <img :src="imagen" alt="Imagen del jugador" class="player-image" />
     <div class="player-name">{{ nombre }}</div>
     <div class="player-role">
-      {{ rol === 'presidente' ? 'Presidente' : rol === 'canciller' ? 'Canciller' : rol }}
+      {{ rol === 'presidente' ? 'Presidente' : rol }}
     </div>
   </div>
 </template>
@@ -35,6 +38,26 @@ defineProps({
   width: 120px; /* Tamaño fijo para las tarjetas */
   margin: 0 10px; /* Espacio entre tarjetas */
   display: inline-block; /* Para que las tarjetas se muestren en línea */
+  position: relative; /* Para posicionar el badge */
+}
+
+.role-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  z-index: 2;
+}
+
+.chancellor-badge {
+  background-color: #ffc107;
+  color: #000;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
 .player-image {

@@ -59,20 +59,28 @@ export const createGame = async (user) => {
   const gameData = {
     codigo: gameCode,
     estado: 'esperando',
-    creador: user.uid,
-    fechaCreacion: serverTimestamp(),
-    turnoJugadorId: null,
-    fallosGobierno: 0,
-    tableros: {
-      tableroLiberal: {
-        leyesLiberales: 0,
-        fallosLiberales: 0
-      },
-      tableroFascista: {
-        leyesFascistas: 0,
-        poderesFascistas: []
-      }
-    }
+    id_presidente: null,
+    id_canciller: null,
+    turnoActual: 0,
+    fascistProgress: 0,
+    liberalProgress: 0,
+    electionTracker: 0,
+    tablero_fascista: {
+      1: null,
+      2: null,
+      3: null,
+      4: null,
+      5: null,
+      6: null,
+    },
+    tablero_liberal: {
+      1: null,
+      2: null,
+      3: null,
+      4: null,
+      5: null,
+    },
+    poderes: []
   };
 
   await setDoc(doc(db, 'partidas', gameCode), gameData);
@@ -81,7 +89,8 @@ export const createGame = async (user) => {
   await addPlayer(gameCode, {
     idJugador: user.uid,
     nombreEnJuego: user.displayName || 'Jugador Anónimo',
-    esHost: true
+    esHost: true,
+    ordenTurno: 1
   });
 
   return gameCode;
