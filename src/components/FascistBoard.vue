@@ -1,5 +1,5 @@
 <template>
-  <div class="container-fluid p-4" style="background-color: #e74c3c">
+  <div class="container-fluid p-4 board rounded-4">
     <div class="row justify-content-center gx-1 mb-3">
       <div
         v-for="(slot, index) in 6"
@@ -7,10 +7,10 @@
         class="col d-flex flex-column align-items-center px-2"
       >
         <div
-          class="border d-flex justify-content-center align-items-center text-center"
+          class="border d-flex justify-content-center align-items-center text-center rounded-3"
           :style="getSlotStyle(index)"
         >
-          <small v-if="computedPowers[index]">{{
+          <small v-if="computedPowers[index]" class="fw-bold p-3">{{
             computedPowers[index]
           }}</small>
         </div>
@@ -94,6 +94,10 @@ export default {
 </script>
 
 <style scoped>
+.board {
+  background-color: #e74c3c;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
 .border {
   border: 2px solid black !important;
 }

@@ -18,8 +18,10 @@
         imagen="/public/image.png"
       /><PlayerContainer nombre="Sebastian" imagen="/public/image.png" />
     </div>
-    <LiberalBoard />
-    <FascistBoard playerCount="9" />
+    <div class="d-flex flex-column gap-4">
+      <LiberalBoard />
+      <FascistBoard playerCount="9" />
+    </div>
     <div class="container mt-5 d-flex justify-content-center gap-4">
       <PolicyCard tipo="fascista" />
       <PolicyCard tipo="liberal" />
