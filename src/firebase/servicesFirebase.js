@@ -64,6 +64,7 @@ export const createGame = async (user) => {
     turnoActual: 0,
     fascistProgress: 0,
     liberalProgress: 0,
+      fase: null,
     electionTracker: 0,
     tablero_fascista: {
       1: null,
@@ -792,7 +793,11 @@ export const startGame = async (gameCode, hostId, players) => {
   batch.update(gameRef, {
     estado: 'iniciada',
     turnoJugadorId: hostId,
-    fechaInicio: serverTimestamp()
+    fechaInicio: serverTimestamp(),
+    tablero:{
+      fase:"postulacion"
+    }
+
   });
 
   await batch.commit();
