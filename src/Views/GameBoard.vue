@@ -151,7 +151,7 @@ export default {
     const currentUser = ref(null);
     const gameStarted = ref(false); // Bandera para evitar múltiples inicios
     const showPowerModal = ref(true)
-    const selectedPower = ref('veto-president') // 'execution', 'identity', etc.
+    const selectedPower = ref('alert') //'execution', 'identity', 'next-president', 'veto-chancellor', 'veto-president', 'alert'
     const selectedPlayer = ref(null)
     const currentPlayer = ref({ id: 'user123', name: 'Jugador Prueba', rol: 'liberal' }) // ya debes tener esto
     // Escuchar jugadores en tiempo real y sincronizar estado local con Firebase
@@ -775,7 +775,9 @@ export default {
  left: 50%;
  transform: translate(-50%, 50%);
  z-index: 50;
- width: 70%;
+ width: 80%;
+ max-width: 700px;
+ box-shadow: 00 10px rgba(0, 0, 0, 0.3);
 }
 .chancellor-selector {
   background: white;

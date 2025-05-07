@@ -13,6 +13,7 @@
   color: white;
   background-color: black;
   border-radius: 20px;
+  padding: 0 1.7rem;
 }
 
 .veto:hover {

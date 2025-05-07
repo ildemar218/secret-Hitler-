@@ -65,5 +65,6 @@
     background-color: white;
     padding: 2em;
     border: 2px solid black;
+    border-radius: 8px;
 }
 </style>
