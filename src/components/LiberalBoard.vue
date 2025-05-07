@@ -14,7 +14,7 @@
       </div>
     </div>
 
-    <!-- Marcador de elecciones fallidas + Acción final en la misma fila -->
+    <!-- Marcador de elecciones fallidas + Acción final -->
     <div class="row justify-content-center">
       <!-- Marcador de elecciones fallidas -->
       <div
@@ -27,23 +27,26 @@
           style="width: 40px; height: 40px"
         >
           <div
-            style="width: 30px; height: 30px"
-            class="rounded-circle bg-black m-1"
+            :class="[
+              'rounded-circle m-1',
+              index + 1 === failedElections ? 'bg-black' : 'bg-white',
+            ]"
+            style="width: 30px; height: 30px; border: 2px solid black"
           ></div>
         </div>
         <small class="mt-1">Fallida</small>
       </div>
 
-      <!-- Acción especial final (en la misma fila) -->
+      <!-- Acción especial final -->
       <div class="col-4 m-1 d-flex flex-column align-items-center">
         <div
           class="border text-center px-3 py-2"
           style="background-color: #cce0ff; width: 100%"
         >
-          <small
-            >Revela y promulga la primera carta de la pila. El marcador vuelve
-            al inicio.</small
-          >
+          <small>
+            Revela y promulga la primera carta de la pila. El marcador vuelve al
+            inicio.
+          </small>
         </div>
       </div>
     </div>
@@ -53,6 +56,13 @@
 <script>
 export default {
   name: "LiberalBoard",
+  data() {
+    return {
+      failedElections: 3,
+    };
+  },
+
+  //Aquí se agrega la logica para traer datos en tiempo real de la base de datos y actualizar la variable failedElections
 };
 </script>
 

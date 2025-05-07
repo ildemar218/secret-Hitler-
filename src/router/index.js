@@ -6,6 +6,7 @@ import PresidentCansillerSelector from "../components/PresidentCansillerSelector
 import JoinGame from "../Views/JoinGame.vue";
 import CreateGame from "../Views/CreateGame.vue";
 import LandingPage from "../Views/LandingPage.vue";
+import Test from "../Views/Test.vue";
 
 const routes = [
   { path: "/login", name: "login", component: Login },
@@ -19,6 +20,7 @@ const routes = [
   { path: "/", name: "register", component: Register },
   { path: "/join-game", name: "join-game", component: JoinGame },
   { path: "/create-game", name: "create-game", component: CreateGame },
+  { path: "/test", name: "test", component: Test },
 ];
 
 const router = createRouter({

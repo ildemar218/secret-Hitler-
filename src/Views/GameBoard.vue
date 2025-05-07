@@ -235,7 +235,7 @@ export default {
   },
   setup(props) {
     const notification = ref({ message: "", type: "" });
-    // const players = ref([]); // Lista de jugadores
+    const players = ref([]); // Lista de jugadores
     const showChancellorSelector = ref(false);
     const fascistProgress = ref(0);
     const liberalProgress = ref(0);
@@ -244,48 +244,12 @@ export default {
     const drawnPolicies = ref([]);
     const showPolicyModal = ref(false);
     const politicasParaCanciller = ref([]);
-    // const currentPresident = ref({ id: null, nombre: null });
-    // const currentChancellor = ref(null);
+    const currentPresident = ref({ id: null, nombre: null });
+    const currentChancellor = ref(null);
     const numPlayers = computed(() => players.value.length); // Número de jugadores
     const showFascistPower = ref(false); // Mostrar poderes fascistas
     const currentUser = ref(null);
     const gameStarted = ref(false); // Bandera para evitar múltiples inicios
-
-    const players = ref([
-      {
-        id: 1,
-        nombre: "Juan Pérez",
-        rol: "Liberal",
-        imagen: "https://via.placeholder.com/100",
-      },
-      {
-        id: 2,
-        nombre: "María Gómez",
-        rol: "Fascista",
-        imagen: "https://via.placeholder.com/100",
-      },
-      {
-        id: 3,
-        nombre: "Luis Ramírez",
-        rol: "Hitler",
-        imagen: "https://via.placeholder.com/100",
-      },
-      {
-        id: 4,
-        nombre: "Ana Torres",
-        rol: "Liberal",
-        imagen: "https://via.placeholder.com/100",
-      },
-      {
-        id: 5,
-        nombre: "Carlos Díaz",
-        rol: "Fascista",
-        imagen: "https://via.placeholder.com/100",
-      },
-    ]);
-
-    const currentPresident = ref(players.value[1]); // María Gómez
-    const currentChancellor = ref(players.value[4]); // Carlos Díaz
 
     // Escuchar jugadores en tiempo real y sincronizar estado local con Firebase
     onMounted(async () => {
