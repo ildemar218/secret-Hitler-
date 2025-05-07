@@ -13,6 +13,8 @@ import {
   where,
   collectionGroup,
   writeBatch,
+  arrayUnion,
+  arrayRemove,
   serverTimestamp
 } from "firebase/firestore";
 import { generateGameCode } from '../utils/gameCodeGenerator';
@@ -59,21 +61,29 @@ export const createGame = async (user) => {
   const gameData = {
     codigo: gameCode,
     estado: 'esperando',
-    creador: user.uid,
-    fechaCreacion: serverTimestamp(),
-    turnoJugadorId: null,
-    fallosGobierno: 0,
-    tableros: {
+    id_presidente: null,
+    id_canciller: null,
+    turnoActual: 0,
+    fascistProgress: 0,
+    liberalProgress: 0,
       fase: null,
-      tableroLiberal: {
-        leyesLiberales: 0,
-        fallosLiberales: 0
-      },
-      tableroFascista: {
-        leyesFascistas: 0,
-        poderesFascistas: []
-      }
-    }
+    electionTracker: 0,
+    tablero_fascista: {
+      1: null,
+      2: null,
+      3: null,
+      4: null,
+      5: null,
+      6: null,
+    },
+    tablero_liberal: {
+      1: null,
+      2: null,
+      3: null,
+      4: null,
+      5: null,
+    },
+    poderes: []
   };
 
   await setDoc(doc(db, 'partidas', gameCode), gameData);
@@ -82,7 +92,8 @@ export const createGame = async (user) => {
   await addPlayer(gameCode, {
     idJugador: user.uid,
     nombreEnJuego: user.displayName || 'Jugador Anónimo',
-    esHost: true
+    esHost: true,
+    ordenTurno: 1
   });
 
   return gameCode;
@@ -287,110 +298,69 @@ export const emptyCollection = async (nombreColeccion) => {
 
 export const createDocument = async (nombreColeccion, dataDocument, idEspecifico = null) => {
   try {
-    // Obtén una referencia a la colección
-    const coleccionRef = collection(db, nombreColeccion);
-    let docRef;
-    // Si se proporciona un ID específico, usa ese ID
     if (idEspecifico) {
-      docRef = doc(coleccionRef, idEspecifico);
-      await setDoc(docRef, dataDocument);
+      await setDoc(doc(db, nombreColeccion, idEspecifico), dataDocument);
+      return idEspecifico;
     } else {
-      
-      docRef = await addDoc(coleccionRef, dataDocument);
+      const docRef = await addDoc(collection(db, nombreColeccion), dataDocument);
+      return docRef.id;
     }
-    console.log("Documento creado con ID: ", docRef.id);
-  } catch (e) {
-    console.error("Error al crear el documento: ", e);
-    throw e;
+  } catch (error) {
+    console.error("Error al crear documento:", error);
+    throw error;
   }
 };
 
 export const readCollection = async (nombreColeccion) => {
   try {
-    // Obtén una referencia a la colección
-    const coleccionRef = collection(db, nombreColeccion);
-
-    // Obtén todos los documentos de la colección
-    const querySnapshot = await getDocs(coleccionRef);
-
-    // Mapea los documentos a un array de objetos
-    // Necesario para poder usarlo en el template
-    const documentos = querySnapshot.docs.map((doc) => ({
+    const querySnapshot = await getDocs(collection(db, nombreColeccion));
+    return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data(),
+      ...doc.data()
     }));
-
-    return documentos;
-  } catch (e) {
-    console.error("Error al leer los documentos: ", e);
+  } catch (error) {
+    console.error("Error al leer colección:", error);
+    throw error;
   }
 };
 
 export const readSubcollection = async (nombreColeccion, idDocumentoPrincipal, nombreSubcoleccion) => {
   try {
-    // Obtén una referencia a la subcolección
-    const subcoleccionRef = collection(db, nombreColeccion, idDocumentoPrincipal, nombreSubcoleccion);
-
-    // Obtén todos los documentos de la subcolección
-    const querySnapshot = await getDocs(subcoleccionRef);
-
-    const documentos = querySnapshot.docs.map((doc) => ({
+    const querySnapshot = await getDocs(collection(db, nombreColeccion, idDocumentoPrincipal, nombreSubcoleccion));
+    return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data(),
+      ...doc.data()
     }));
-
-    return documentos;
-  } catch (e) {
-    console.error("Error al leer la subcolección: ", e);
-    throw e;
+  } catch (error) {
+    console.error("Error al leer subcolección:", error);
+    throw error;
   }
 };
 
-
 export const readDocumentById = async (nombreColeccion, id) => {
   try {
-    // Obtén una referencia al documento
     const docRef = doc(db, nombreColeccion, id);
-
-    // Obtén el documento
     const docSnap = await getDoc(docRef);
-
-    // Verifica si el documento existe y lo formatea
-    if (docSnap.exists()) {
-      // console.log("Documento encontrado: ", docSnap.data());
-      return { id: docSnap.id, ...docSnap.data() };
-    } else {
-      console.log("No se encontró el documento con ID: ", id);
-      return null;
-    }
-  } catch (e) {
-    console.error("Error al leer el documento: ", e);
-    throw e;
+    return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } : null;
+  } catch (error) {
+    console.error("Error al leer documento:", error);
+    throw error;
   }
 };
 
 export const queryDocuments = async (nombreColeccion, campo, valor) => {
   try {
-    // Obtén una referencia a la colección
-    const coleccionRef = collection(db, nombreColeccion);
-
-    // Filtra los documentos por el campo y valor especificados
-    const consulta = query(coleccionRef, where(campo, "==", valor));
-
-    // Obtén los documentos filtrados
-    const querySnapshot = await getDocs(consulta);
-
-    // Mapea los documentos a un array de objetos
-    const documentos = querySnapshot.docs.map((doc) => ({
+    const q = query(collection(db, nombreColeccion), where(campo, "==", valor));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      ...doc.data(),
+      ...doc.data()
     }));
-
-    return documentos;
-  } catch (e) {
-    console.error("Error al consultar los documentos: ", e);
+  } catch (error) {
+    console.error("Error al consultar documentos:", error);
+    throw error;
   }
-}
+};
 
 export const querySingleDocument = async (nombreColeccion, campo, valor) => {
   try {
@@ -418,44 +388,30 @@ export const querySingleDocument = async (nombreColeccion, campo, valor) => {
 
 export const updateDocument = async (nombreColeccion, id, dataDocument) => {
   try {
-    // Obtén una referencia al documento
     const docRef = doc(db, nombreColeccion, id);
-
-    // Actualiza el documento
     await updateDoc(docRef, dataDocument);
-
-    console.log("Documento actualizado con ID: ", id);
-  } catch (e) {
-    console.error("Error al actualizar el documento: ", e);
+  } catch (error) {
+    console.error("Error al actualizar documento:", error);
+    throw error;
   }
 };
 
 export const updateSubcollectionDocument = async (nombreColeccion, idDocumentoPrincipal, nombreSubcoleccion, idSubdocumento, dataDocument) => {
   try {
-    // Referencia al documento dentro de la subcolección
     const docRef = doc(db, nombreColeccion, idDocumentoPrincipal, nombreSubcoleccion, idSubdocumento);
-
-    // Actualizar los campos en el documento
     await updateDoc(docRef, dataDocument);
-
-    console.log(`Documento actualizado en la subcolección "${nombreSubcoleccion}" con ID: ${idSubdocumento}`);
-  } catch (e) {
-    console.error("Error al actualizar el documento en la subcolección:", e);
-    throw e;
+  } catch (error) {
+    console.error("Error al actualizar documento en subcolección:", error);
+    throw error;
   }
 };
 
 export const deleteDocument = async (nombreColeccion, id) => {
   try {
-    // Obtén una referencia al documento
-    const docRef = doc(db, nombreColeccion, id);
-
-    // Elimina el documento
-    await deleteDoc(docRef);
-
-    console.log("Documento eliminado con ID: ", id);
-  } catch (e) {
-    console.error("Error al eliminar el documento: ", e);
+    await deleteDoc(doc(db, nombreColeccion, id));
+  } catch (error) {
+    console.error("Error al eliminar documento:", error);
+    throw error;
   }
 };
 
@@ -477,93 +433,56 @@ export const deleteCollection = async (nombreColeccion) => {
   }
 };
 
-export const createSubCollection = async (
-  nombreColeccion,
-  id,
-  nombreSubColeccion,
-  dataDocument,
-  idEspecifico = null
-) => {
+export const createSubCollection = async (nombreColeccion, idDocumento, nombreSubColeccion, dataDocument) => {
   try {
-    // Obtén una referencia al documento padre
-    const docRef = doc(db, nombreColeccion, id);
-
-    // Obtén una referencia a la subcolección
-    const subColeccionRef = collection(docRef, nombreSubColeccion);
-    let docSubRef;
-    // Si se proporciona un ID específico, usa ese ID
-    if (idEspecifico) {
-      docSubRef = doc(subColeccionRef, idEspecifico);
-      await setDoc(docSubRef, dataDocument);
-    } else {
-      
-      docSubRef = await addDoc(subColeccionRef, dataDocument);
-    }
-    console.log("Documento agregado a la subcolección con ID: ", docSubRef.id);
-  } catch (e) {
-    console.error("Error al crear el documento en la subcolección: ", e);
+    const docRef = await addDoc(collection(db, nombreColeccion, idDocumento, nombreSubColeccion), dataDocument);
+    return docRef.id;
+  } catch (error) {
+    console.error("Error al crear subcolección:", error);
+    throw error;
   }
 };
 
 //Mantener actualizacion en tiempo real de una coleccion
 export const onSnapshotCollection = (nombreColeccion, callback) => {
   try {
-    // Obtén una referencia a la colección
-    const coleccionRef = collection(db, nombreColeccion);
-
-    // Escucha los cambios en tiempo real
-    const unsubscribe = onSnapshot(coleccionRef, (snapshot) => {
-      const documentos = snapshot.docs.map((doc) => ({
+    return onSnapshot(collection(db, nombreColeccion), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
+        ...doc.data()
       }));
-      callback(documentos);
+      callback(data);
     });
-
-    return unsubscribe; // Devuelve la función de cancelación
-  } catch (e) {
-    console.error("Error al escuchar la colección: ", e);
+  } catch (error) {
+    console.error("Error al escuchar colección:", error);
+    throw error;
   }
 };
 
-export const onSnapshotSubcollection = (nombreColeccion, idDocumentoPrincipal, nombreSubcoleccion, callback) => {
+export const onSnapshotSubcollection = (nombreColeccion, idDocumento, nombreSubColeccion, callback) => {
   try {
-    // Obtén una referencia a la subcolección
-    const subcoleccionRef = collection(db, nombreColeccion, idDocumentoPrincipal, nombreSubcoleccion);
-
-    // Escucha los cambios en tiempo real en la subcolección
-    const unsubscribe = onSnapshot(subcoleccionRef, (snapshot) => {
-      const documentos = snapshot.docs.map((doc) => ({
+    return onSnapshot(collection(db, nombreColeccion, idDocumento, nombreSubColeccion), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
+        ...doc.data()
       }));
-      callback(documentos);
+      callback(data);
     });
-
-    return unsubscribe; // Devuelve la función para cancelar la suscripción
-  } catch (e) {
-    console.error("Error al escuchar la subcolección: ", e);
+  } catch (error) {
+    console.error("Error al escuchar subcolección:", error);
+    throw error;
   }
 };
 
 //Mantener actualizacion en tiempo real de un documento
 export const onSnapshotDocument = (nombreColeccion, id, callback) => {
   try {
-    // Obtén una referencia al documento
-    const docRef = doc(db, nombreColeccion, id);
-
-    // Escucha los cambios en tiempo real
-    const unsubscribe = onSnapshot(docRef, (doc) => {
-      if (doc.exists()) {
-        callback({ id: doc.id, ...doc.data() });
-      } else {
-        console.log("No se encontró el documento con ID: ", id);
-      }
+    return onSnapshot(doc(db, nombreColeccion, id), (doc) => {
+      callback(doc.exists() ? { id: doc.id, ...doc.data() } : null);
     });
-
-    return unsubscribe; // Devuelve la función de cancelación
-  } catch (e) {
-    console.error("Error al escuchar el documento: ", e);
+  } catch (error) {
+    console.error("Error al escuchar documento:", error);
+    throw error;
   }
 };
 
@@ -612,7 +531,6 @@ export const onSnapshotSubcollectionWithFullData = (
   }
 };
 
-
 export const listenToSubcollectionFiltered = (subcollection, callback, field = "place", value = "mano") => {
   const subcollectionQuery = query(
     collectionGroup(db, subcollection), // Subcolección parametrizada
@@ -631,7 +549,6 @@ export const listenToSubcollectionFiltered = (subcollection, callback, field = "
 
   return unsubscribe; // Retorna una función para detener la escucha
 };
-
 
 export const listenToMultipleSubcollections = (subcollections, callback, field , value) => {
   const unsubscribes = [];
@@ -784,7 +701,6 @@ export const startGame = async (gameCode, hostId, players) => {
   batch.update(gameRef, {
     estado: 'iniciada',
     turnoJugadorId: hostId,
-    fechaInicio: serverTimestamp(),
     tablero:{
       fase:"postulacion"
     }
@@ -867,4 +783,127 @@ export const onPlayersChange = (gameCode, callback) => {
     collection(db, 'partidas', gameCode, 'jugadores_partida'),
     (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() })))
   );
+};
+
+/**
+ * Agregar un jugador a una partida
+ */
+export const addPlayerToGame = async (idPartida, playerData) => {
+  try {
+    const partidaRef = doc(db, 'partidas', idPartida);
+    await updateDoc(partidaRef, {
+      players: arrayUnion(playerData)
+    });
+  } catch (error) {
+    console.error("Error al agregar jugador:", error);
+    throw error;
+  }
+};
+
+/**
+ * Remover un jugador de una partida
+ */
+export const removePlayerFromGame = async (idPartida, playerData) => {
+  try {
+    const partidaRef = doc(db, 'partidas', idPartida);
+    await updateDoc(partidaRef, {
+      players: arrayRemove(playerData)
+    });
+  } catch (error) {
+    console.error("Error al remover jugador:", error);
+    throw error;
+  }
+};
+
+/**
+ * Crear una nueva votación
+ * @param {string} idPartida - ID de la partida
+ * @param {Object} votacionData - Datos de la votación
+ * @returns {Promise<string>} ID de la votación creada
+ */
+export const createVotacion = async (idPartida, votacionData) => {
+  try {
+    const votacionRef = doc(collection(db, 'partidas', idPartida, 'votaciones'));
+    await setDoc(votacionRef, {
+      ...votacionData,
+      fecha_creacion: serverTimestamp()
+    });
+    return votacionRef.id;
+  } catch (error) {
+    console.error("Error al crear votación:", error);
+    throw error;
+  }
+};
+
+/**
+ * Agregar un voto a una votación
+ * @param {string} idPartida - ID de la partida
+ * @param {string} idVotacion - ID de la votación
+ * @param {Object} votoData - Datos del voto
+ */
+export const addVoto = async (idPartida, idVotacion, votoData) => {
+  try {
+    const votoRef = doc(collection(db, 'partidas', idPartida, 'votaciones', idVotacion, 'votos'));
+    await setDoc(votoRef, {
+      ...votoData,
+      fecha_voto: serverTimestamp()
+    });
+  } catch (error) {
+    console.error("Error al agregar voto:", error);
+    throw error;
+  }
+};
+
+/**
+ * Obtener los votos de una votación
+ * @param {string} idPartida - ID de la partida
+ * @param {string} idVotacion - ID de la votación
+ * @returns {Promise<Array>} Lista de votos
+ */
+export const getVotos = async (idPartida, idVotacion) => {
+  try {
+    const votosRef = collection(db, 'partidas', idPartida, 'votaciones', idVotacion, 'votos');
+    const snapshot = await getDocs(votosRef);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error("Error al obtener votos:", error);
+    throw error;
+  }
+};
+
+/**
+ * Actualizar una votación
+ * @param {string} idPartida - ID de la partida
+ * @param {string} idVotacion - ID de la votación
+ * @param {Object} updateData - Datos a actualizar
+ */
+export const updateVotacion = async (idPartida, idVotacion, updateData) => {
+  try {
+    const votacionRef = doc(db, 'partidas', idPartida, 'votaciones', idVotacion);
+    await updateDoc(votacionRef, updateData);
+  } catch (error) {
+    console.error("Error al actualizar votación:", error);
+    throw error;
+  }
+};
+
+/**
+ * Escuchar cambios en los votos de una votación
+ * @param {string} idPartida - ID de la partida
+ * @param {string} idVotacion - ID de la votación
+ * @param {Function} callback - Función a ejecutar cuando hay cambios
+ * @returns {Function} Función para cancelar la suscripción
+ */
+export const onVotosChange = (idPartida, idVotacion, callback) => {
+  const votosRef = collection(db, 'partidas', idPartida, 'votaciones', idVotacion, 'votos');
+  return onSnapshot(votosRef, (snapshot) => {
+    const votos = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+    callback(votos);
+  });
 };
