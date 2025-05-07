@@ -39,16 +39,17 @@
 
     <!-- Área de Políticas -->
     <PolicyArea
-      :politicas="politicas"
+      :politicas="politicasActivas"
       :liberal-progress="liberalProgress"
       :fascist-progress="fascistProgress"
       :election-tracker="electionTracker"
       :num-players="numPlayers"
+      :cartas-descartadas="totalCartasDescartadas"
       @policy-effect="handleFascistEffect"
     />
 
     <!-- Botón de Robar Políticas -->
-    <div v-if="partida?.fase === 'seleccion_politicas' && currentUser?.id === currentPresident?.id" class="mt-4">
+    <div v-if="showDrawPoliciesButton" class="mt-4">
       <button class="btn btn-primary" @click="drawPolicies">
         Robar 3 Cartas
       </button>
@@ -78,7 +79,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import NotificationArea from "../components/NotificationArea.vue";
 import PlayersArea from "../components/PlayersArea.vue";
 import PresidentCansillerSelector from "../components/PresidentCansillerSelector.vue";
@@ -108,10 +109,8 @@ export default {
     VotingModal
   },
   setup(props) {
-    const notification = ref({ 
-      message: "Bienvenido a la partida", 
-      type: "info" // Inicializar con un tipo válido
-    });
+    // Estado base
+    const notification = ref({ message: "Bienvenido a la partida", type: "info" });
     const players = ref([]);
     const showChancellorSelector = ref(false);
     const fascistProgress = ref(0);
@@ -120,7 +119,6 @@ export default {
     const isGameOver = ref(false);
     const politicas = ref([]);
     const currentPresident = ref({ id: null, nombre: null });
-    const numPlayers = computed(() => players.value.length);
     const currentUser = ref(null);
     const gameStarted = ref(false);
     const partida = ref(null);
@@ -129,7 +127,24 @@ export default {
     const votingPhase = ref(false);
     const gameResult = ref(null);
 
-    // Escuchar jugadores en tiempo real y sincronizar estado local con Firebase
+    // Computed properties
+    const numPlayers = computed(() => players.value.length);
+    
+    const totalCartasDescartadas = computed(() => {
+      // Suma las políticas liberales y fascistas jugadas
+      return fascistProgress.value + liberalProgress.value;
+    });
+
+    const politicasActivas = computed(() => {
+      return politicas.value.filter(p => p.estado === "seleccion");
+    });
+
+    const showDrawPoliciesButton = computed(() => {
+      return partida.value?.fase === 'seleccion_politicas' && 
+             currentUser.value?.id === currentPresident.value?.id;
+    });
+
+    // Lógica de montaje y observadores
     onMounted(async () => {
       try {
         const user = await AuthService.getCurrentUser();
@@ -138,7 +153,6 @@ export default {
             id: user.uid, 
             name: user.displayName 
           };
-          console.log("Usuario actual:", currentUser.value);
         }
 
         // Escuchar cambios en los jugadores
@@ -147,7 +161,7 @@ export default {
           props.codigoSala,
           "jugadores_partida",
           (jugadores) => {
-            const updatedPlayers = jugadores.map((jugador) => ({
+            players.value = jugadores.map((jugador) => ({
               id: jugador.idJugador,
               nombre: jugador.nombreEnJuego,
               rol: jugador.rol,
@@ -155,9 +169,6 @@ export default {
               ordenTurno: jugador.ordenTurno,
               imagen: jugador.imagen || '/public/image.png',
             }));
-
-            players.value = updatedPlayers;
-            console.log("Jugadores actualizados desde la base de datos:", players.value);
           }
         );
 
@@ -165,95 +176,92 @@ export default {
         let previousPresidentId = null;
 
         const unsubscribeGame = onSnapshotDocument("partidas", props.codigoSala, (partidaData) => {
-          console.log("[🔄 Snapshot] Datos actualizados de la partida:", partidaData);
           partida.value = partidaData;
 
           if (!partidaData) return;
 
+          // Actualizar contadores
           fascistProgress.value = partidaData.fascistProgress || 0;
+          liberalProgress.value = partidaData.liberalProgress || 0;
           electionTracker.value = partidaData.electionTracker || 0;
 
-          // Actualizar fase de votación basada en la fase de la partida
+          // Manejar fase de votación
           if (partidaData.fase === "votacion") {
-            votingPhase.value = true;
-            
-            // Obtener la votación activa de la subcolección votaciones
-            const votacionRef = doc(db, "partidas", props.codigoSala, "votaciones", partidaData.votacion_activa);
-            getDoc(votacionRef).then((docSnap) => {
-              if (docSnap.exists()) {
-                const votacionActiva = docSnap.data();
-                const canciller = players.value.find(p => p.id === votacionActiva.candidato_id);
-                if (canciller) {
-                  currentChancellor.value = canciller;
-                  // Mostrar el modal de votación para todos los jugadores
-                  showVotingModal.value = true;
-                  console.log("Mostrando modal de votación para:", currentUser.value?.nombre);
-                }
-              }
-            });
+            handleVotingPhase(partidaData);
           } else {
-            // Ocultar el modal y limpiar el estado cuando no estamos en fase de votación
-            showVotingModal.value = false;
-            votingPhase.value = false;
-            if (partidaData.fase !== "seleccion_politicas") {
-              currentChancellor.value = null;
-            }
+            cleanupVotingPhase();
           }
 
           // Detectar cambio de presidente
-          if (partidaData.id_presidente && partidaData.id_presidente !== previousPresidentId) {
+          if (partidaData.id_presidente !== previousPresidentId) {
+            handlePresidentChange(partidaData.id_presidente);
             previousPresidentId = partidaData.id_presidente;
-
-            const president = players.value.find(player => player.id === partidaData.id_presidente);
-
-            if (president) {
-              currentPresident.value = president;
-
-              notification.value = {
-                message: `¡${president.nombre} es el Presidente actual!`,
-                type: "info"
-              };
-
-              // Mostrar el selector solo si el jugador actual es el presidente
-              showChancellorSelector.value = currentUser.value && currentUser.value.id === president.id;
-            }
           }
 
+          // Iniciar partida si es necesario
           if (partidaData.estado === "iniciada" && !gameStarted.value) {
-            console.log("[🎮 Partida iniciada]");
             gameStarted.value = true;
             startGame();
           }
         });
 
-        // Escuchar votaciones activas
-        const unsubscribeVotaciones = onSnapshotSubcollection(
+        // Escuchar cambios en las políticas
+        const unsubscribePolicies = onSnapshotSubcollection(
           "partidas",
           props.codigoSala,
-          "votaciones",
-          (votaciones) => {
-            const votacionActiva = votaciones[votaciones.length - 1];
-            if (votacionActiva && !votacionActiva.aprobada) {
-              showVotingModal.value = true;
-              votingPhase.value = true;
-              currentChancellor.value = players.value.find(p => p.id === votacionActiva.candidato_id);
-            } else {
-              showVotingModal.value = false;
-              votingPhase.value = false;
-            }
+          "politicas",
+          (politicasData) => {
+            politicas.value = politicasData;
           }
         );
 
         return () => {
           unsubscribePlayers();
           unsubscribeGame();
-          unsubscribeVotaciones();
+          unsubscribePolicies();
         };
       } catch (error) {
         console.error("Error:", error);
         notification.value = { message: "Error al cargar la partida", type: "danger" };
       }
     });
+
+    // Funciones auxiliares
+    const handleVotingPhase = async (partidaData) => {
+      votingPhase.value = true;
+      if (partidaData.votacion_activa) {
+        const votacionRef = doc(db, "partidas", props.codigoSala, "votaciones", partidaData.votacion_activa);
+        const docSnap = await getDoc(votacionRef);
+        if (docSnap.exists()) {
+          const votacionActiva = docSnap.data();
+          const canciller = players.value.find(p => p.id === votacionActiva.candidato_id);
+          if (canciller) {
+            currentChancellor.value = canciller;
+            showVotingModal.value = true;
+          }
+        }
+      }
+    };
+
+    const cleanupVotingPhase = () => {
+      showVotingModal.value = false;
+      votingPhase.value = false;
+      if (partida.value?.fase !== "seleccion_politicas") {
+        currentChancellor.value = null;
+      }
+    };
+
+    const handlePresidentChange = (newPresidentId) => {
+      const president = players.value.find(player => player.id === newPresidentId);
+      if (president) {
+        currentPresident.value = president;
+        notification.value = {
+          message: `¡${president.nombre} es el Presidente actual!`,
+          type: "info"
+        };
+        showChancellorSelector.value = currentUser.value?.id === president.id;
+      }
+    };
 
     const handleFascistEffect = () => {
       console.log("Efecto fascista activado");
@@ -482,9 +490,59 @@ export default {
         const snapshot = await getDocs(q);
         
         if (snapshot.empty || snapshot.docs.length < 3) {
+          // Si no hay suficientes cartas, reiniciar el mazo
           notification.value = {
-            message: "No hay suficientes políticas en el mazo",
-            type: "warning"
+            message: "Reiniciando el mazo con las cartas descartadas...",
+            type: "info"
+          };
+
+          // Obtener todas las cartas descartadas
+          const descartadasQuery = query(politicasRef, where("estado", "==", "descartada"));
+          const descartadasSnap = await getDocs(descartadasQuery);
+          const cartasDescartadas = descartadasSnap.docs;
+
+          // Mezclar las cartas descartadas
+          const cartasMezcladas = cartasDescartadas.sort(() => Math.random() - 0.5);
+
+          // Devolver las cartas al mazo
+          const batch = writeBatch(db);
+          cartasMezcladas.forEach((carta) => {
+            const cartaRef = doc(politicasRef, carta.id);
+            batch.update(cartaRef, { estado: "mazo" });
+          });
+          await batch.commit();
+
+          // Intentar obtener las cartas nuevamente
+          const nuevoSnapshot = await getDocs(q);
+          if (nuevoSnapshot.empty || nuevoSnapshot.docs.length < 3) {
+            notification.value = {
+              message: "Error: No hay suficientes cartas disponibles",
+              type: "error"
+            };
+            return;
+          }
+
+          // Continuar con las cartas del mazo reiniciado
+          const politicasSeleccionadas = nuevoSnapshot.docs.slice(0, 3).map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+
+          // Actualizar el estado de las políticas seleccionadas
+          for (const politica of politicasSeleccionadas) {
+            await updateDocument("partidas", props.codigoSala, {
+              [`politicas.${politica.id}.estado`]: "seleccion"
+            });
+          }
+
+          await updateDocument("partidas", props.codigoSala, {
+            fase: "seleccion_presidente",
+            politicas_seleccionadas: politicasSeleccionadas.map(p => p.id)
+          });
+
+          notification.value = {
+            message: "Mazo reiniciado. Has robado 3 cartas. Selecciona 2 para el canciller.",
+            type: "success"
           };
           return;
         }
@@ -523,6 +581,7 @@ export default {
     };
 
     return {
+      // Estado
       notification,
       players,
       showChancellorSelector,
@@ -530,7 +589,7 @@ export default {
       liberalProgress,
       electionTracker,
       isGameOver,
-      politicas,
+      politicasActivas,
       currentPresident,
       numPlayers,
       currentUser,
@@ -539,6 +598,10 @@ export default {
       showVotingModal,
       votingPhase,
       gameResult,
+      totalCartasDescartadas,
+      showDrawPoliciesButton,
+
+      // Métodos
       handleFascistEffect,
       handleChancellorSelected,
       handleVote,
@@ -547,7 +610,7 @@ export default {
       startGame,
       drawPolicies
     };
-  },
+  }
 };
 </script>
 
@@ -555,12 +618,16 @@ export default {
 .game-container {
   max-width: 1400px;
   margin: 0 auto;
+  min-height: 100vh;
+  padding: 2rem 1rem;
 }
 
 .decks-container {
   background-color: white;
   border-radius: 8px;
   padding: 1rem;
+  margin: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .game-over {
@@ -568,5 +635,12 @@ export default {
   background-color: #f8f9fa;
   border-radius: 8px;
   margin-top: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 768px) {
+  .game-container {
+    padding: 1rem 0.5rem;
+  }
 }
 </style>
