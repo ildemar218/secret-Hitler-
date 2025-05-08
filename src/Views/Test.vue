@@ -27,6 +27,18 @@
       <PolicyCard tipo="liberal" />
     </div>
   </div>
+  <div class="w-100 d-flex justify-content-center my-4">
+    <button
+      class="btn btn-primary"
+      data-bs-toggle="modal"
+      data-bs-target="#lealtadModal"
+    >
+      Mostrar Partido Político
+    </button>
+  </div>
+
+  <!-- El componente del modal -->
+  <ModalRole politicalParty="fascista" />
 </template>
 
 <script>
@@ -34,6 +46,7 @@ import PlayerContainer from "../components/PlayerContainer.vue";
 import FascistBoard from "../components/FascistBoard.vue";
 import LiberalBoard from "../components/LiberalBoard.vue";
 import PolicyCard from "../components/PolicyCard.vue";
+import ModalRole from "../components/ModalRole.vue";
 
 export default {
   name: "Test",
@@ -42,6 +55,7 @@ export default {
     FascistBoard,
     LiberalBoard,
     PolicyCard,
+    ModalRole,
   },
 };
 </script>
