@@ -24,6 +24,13 @@
       />
     </div>
 
+    <div v-if="showConfirmPolicyModal" @close="closePolicyModal" class="confirmpolicy-container">
+      <ConfirmPolicy 
+      :policy="promulgatedPolicy"
+      @confirm="handleConfirmPolicy"
+      />
+    </div>
+
     <!-- Contenedor de Jugadores -->
     <div class="players-container mb-4">
       <div v-if="players.length > 0">
@@ -120,6 +127,7 @@ import { onSnapshotSubcollection, updateDocument, createSubCollection, enrichDat
 import { AuthService } from '../firebase/auth.js';
 import { writeBatch, doc } from "firebase/firestore";
 import PowerModal from '../components/PowerModal.vue'
+import ConfirmPolicy from '../components/ConfirmPolicy.vue'
 
 export default {
   props: ["codigoSala"],
@@ -131,7 +139,8 @@ export default {
     LiberalCard,
     PowerModal,
     NotificationArea,
-    PolicyArea
+    PolicyArea,
+    ConfirmPolicy
   },
   setup(props) {
     const notification = ref({ message: "", type: "" });
@@ -150,10 +159,12 @@ export default {
     const showFascistPower = ref(false); // Mostrar poderes fascistas
     const currentUser = ref(null);
     const gameStarted = ref(false); // Bandera para evitar múltiples inicios
-    const showPowerModal = ref(true)
-    const selectedPower = ref('alert') //'execution', 'identity', 'next-president', 'veto-chancellor', 'veto-president', 'alert'
+    const showPowerModal = ref(false)
+    const selectedPower = ref('') //'execution', 'identity', 'next-president', 'veto-chancellor', 'veto-president', 'alert'
     const selectedPlayer = ref(null)
-    const currentPlayer = ref({ id: 'user123', name: 'Jugador Prueba', rol: 'liberal' }) // ya debes tener esto
+    const currentPlayer = ref(currentUser) // ya debes tener esto
+    const showConfirmPolicyModal = ref(false)
+    const promulgatedPolicy = ref('fascist') // 'fascist' o 'liberal'
     // Escuchar jugadores en tiempo real y sincronizar estado local con Firebase
     onMounted(async () => {
       try {
@@ -627,6 +638,19 @@ export default {
       closePowerModal()
     }
 
+    function openPolicyModal(policy) {
+      promulgatedPolicy.value = policy
+      showConfirmPolicyModal.value = true
+    }
+
+    function closePolicyModal() {
+      showConfirmPolicyModal.value = false
+    }
+
+    function handleConfirmPolicy() {
+      closePolicyModal()
+    }
+
     if (electionTracker < 0 || electionTracker > 3) {
       console.error("Valor inválido para electionTracker:", electionTracker);
     }
@@ -673,7 +697,12 @@ export default {
       handlePresidentPolicySelection,
       handleChancellorPolicySelection,
       selectRandomPresident,
-      finalizarPresidencia
+      finalizarPresidencia,
+      openPolicyModal,
+      closePolicyModal,
+      showConfirmPolicyModal,
+      promulgatedPolicy,
+      handleConfirmPolicy
     };
   },
 };
@@ -807,5 +836,16 @@ export default {
 .player-option button:hover {
   background-color: #e9ecef;
   transform: translateX(5px);
+}
+
+.confirmpolicy-container{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  z-index: 50;
+  width: 80%;
+  max-width: 700px;
+  box-shadow: 00 10px rgba(0, 0, 0, 0.3);
 }
 </style>

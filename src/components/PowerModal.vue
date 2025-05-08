@@ -1,6 +1,6 @@
 <template>
     <div class="power-modal">
-        <BaseModal v-if="visible" @close="close">
+        <div v-if="visible" @close="close">
           <component
             :is="currentViewComponent"
             :players="players"
@@ -11,7 +11,7 @@
             @confirm="handleConfirm"
             @select="handleSelect"
           />
-        </BaseModal>
+        </div>
     </div>
 </template>
   
