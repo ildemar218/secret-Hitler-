@@ -33,6 +33,7 @@
     <PresidentCansillerSelector
       v-if="showChancellorSelector"
       :players="players.filter(p => p.id !== currentPresident?.id && p.esta_vivo)"
+      :codigo-sala="codigoSala"
       :presidentId="currentPresident?.id"
       @chancellor-selected="handleChancellorSelected"
     />

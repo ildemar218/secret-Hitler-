@@ -7,11 +7,13 @@
         <!-- Primera fila -->
         <div class="d-flex justify-content-center w-100 gap-2">
           <button
-            v-for="jugador in firstRow"
-            :key="jugador.id"
-            @click="selectChancellor(jugador)"
-            class="player-button"
-          >
+  v-for="jugador in firstRow"
+  :key="jugador.id"
+  @click="selectChancellor(jugador)"
+  class="player-button"
+  :disabled="!esElegibleComoCanciller(jugador)"
+>
+
             <div class="contenedor-imagen mini-imagen">
               <img :src="jugador.imagen || '/image.png'" alt="Imagen" />
             </div>
@@ -22,11 +24,13 @@
         <!-- Segunda fila -->
         <div class="d-flex justify-content-center w-100 gap-2 mt-2">
           <button
-            v-for="jugador in secondRow"
-            :key="jugador.id"
-            @click="selectChancellor(jugador)"
-            class="player-button"
-          >
+  v-for="jugador in secondRow"
+  :key="jugador.id"
+  @click="selectChancellor(jugador)"
+  class="player-button"
+  :disabled="!esElegibleComoCanciller(jugador)"
+>
+
             <div class="contenedor-imagen mini-imagen">
               <img :src="jugador.imagen || '/image.png'" alt="Imagen" />
             </div>
@@ -39,29 +43,113 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { db } from '../firebase/firebase.js';  // Asegúrate de importar correctamente tu configuración de Firebase
+import { doc, getDoc } from 'firebase/firestore'
 
 // Props y eventos
 const props = defineProps({
-  players: {
-    type: Array,
+  codigoSala: {
+    type: String,
+    required: true
+  },
+  idPresidenteAnterior: {
+    type: String,
+    required: true
+  },
+  idCancillerAnterior: {
+    type: String,
     required: true
   },
   presidentId: {
     type: String,
+    required: true
+  },
+  players: {
+    type: Array,
     required: true
   }
 })
 
 const emit = defineEmits(['chancellor-selected'])
 
+// Variables reactivas
+const partida = ref(null)
+const loading = ref(true)
+
+// Función para obtener la partida desde Firestore por el código de sala
+async function obtenerPartidaPorCodigo(codigoSala) {
+  try {
+    // Buscamos el documento de la partida en Firestore usando el codigoSala
+    const partidaRef = doc(db, 'partidas', codigoSala)  // Suponiendo que la colección se llama 'partidas'
+    const partidaSnapshot = await getDoc(partidaRef)
+
+    if (partidaSnapshot.exists()) {
+      // Si la partida existe, asignamos sus datos a la variable reactivas
+      partida.value = partidaSnapshot.data()
+      console.log('Partida encontrada:', partida.value)
+    } else {
+      console.log('No se encontró la partida para el código de sala:', codigoSala)
+    }
+  } catch (error) {
+    console.error('Error al obtener la partida:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Llamamos a la función para obtener la partida cuando se monta el componente
+onMounted(() => {
+  obtenerPartidaPorCodigo(props.codigoSala)
+})
+
 // Computamos los jugadores disponibles (sin el presidente y los muertos)
 const filteredPlayers = computed(() =>
-  props.players.filter(jugador => 
-    jugador.id !== props.presidentId && 
-    jugador.esta_vivo !== false
+  props.players.filter(jugador =>
+    jugador.esta_vivo !== false && jugador.id !== props.presidentId
   )
 )
+
+function esElegibleComoCanciller(jugador) {
+  const estaVivo = jugador.esta_vivo !== false
+  const noEsPresidente = jugador.id !== props.presidentId
+  const vivos = props.players.filter(j => j.esta_vivo !== false)
+  const vivosCount = vivos.length + 1
+
+  console.log(`Evaluando jugador: ${jugador.nombre} (ID: ${jugador.id})`)
+  console.log(`Código de sala: ${props.codigoSala}`)
+  console.log(` - ¿Está vivo?: ${estaVivo}`)
+  console.log(` - ¿No es presidente actual?: ${noEsPresidente}`)
+  console.log(` - Jugadores vivos (sin presidente): ${vivosCount}`)
+  console.log(` - ID del presidente anterior: ${partida.value?.id_presidente_anterior}`)
+  console.log(` - ID del canciller anterior: ${partida.value?.id_canciller_anterior}`)
+
+  if (!estaVivo || !noEsPresidente) {
+    console.log(' → No elegible: está muerto o es el presidente actual.')
+    return false
+  }
+
+  if (vivosCount <= 5) {
+    if (jugador.id === partida.value?.id_canciller_anterior) {  // Aquí se corrige el campo
+      console.log(' → No elegible: fue canciller en la ronda anterior (juego con 5 o menos).')
+      return false
+    }
+    console.log(' → Elegible (juego con 5 o menos jugadores).')
+    return true
+  } else {
+    if (jugador.id === partida.value?.id_canciller_anterior) {  // Aquí se corrige el campo
+      console.log(' → No elegible: fue canciller en la ronda anterior (6 o más jugadores).')
+      return false
+    }
+    if (jugador.id === partida.value?.id_presidente_anterior) {  // Aquí se corrige el campo
+      console.log(' → No elegible: fue presidente en la ronda anterior (6 o más jugadores).')
+      return false
+    }
+    console.log(' → Elegible (juego con 6 o más jugadores).')
+    return true
+  }
+}
+
 
 // Dividimos los jugadores en dos filas
 const half = computed(() => Math.ceil(filteredPlayers.value.length / 2))
@@ -73,6 +161,8 @@ function selectChancellor(jugador) {
   emit('chancellor-selected', jugador)
 }
 </script>
+
+
 
 <style scoped>
 .modal-overlay {
@@ -142,5 +232,10 @@ function selectChancellor(jugador) {
 .mini-texto {
   font-size: 14px;
   color: #495057;
+}
+
+.player-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
