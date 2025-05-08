@@ -366,7 +366,9 @@ export default {
             await updateDocument("partidas", props.codigoSala, {
               fase: yesVotes > noVotes ? "Legislacion" : "seleccion_presidente",
               id_canciller: yesVotes > noVotes ? currentChancellor.value.id : null,
-              votacion_activa: null
+              votacion_activa: null,
+              id_canciller_anterior: yesVotes > noVotes ? currentChancellor.value.id : null,
+              id_presidente_anterior:yesVotes > noVotes ? currentPresident.value.id : null,
             });
 
             if (yesVotes > noVotes) {
