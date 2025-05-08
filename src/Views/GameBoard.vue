@@ -188,7 +188,7 @@ export default {
                   currentChancellor.value = canciller;
                   // Mostrar el modal de votación para todos los jugadores
                   showVotingModal.value = true;
-                  console.log("Mostrando modal de votación para:", currentUser.value?.nombre);
+                  console.log("Mostrando modal de votación para:", currentUser.value?.id);
                 }
               }
             });
@@ -350,9 +350,18 @@ export default {
 
         // Escuchar los votos en tiempo real
         const unsubscribe = onVotosChange(props.codigoSala, votacionActiva, async (votos) => {
-          if (votos.length === players.value.length) {
+          if (votos.length === players.value.length ) {
             const yesVotes = votos.filter(v => v.voto === 'ja').length;
             const noVotes = votos.filter(v => v.voto === 'nein').length;
+
+// Actualizar la fase y el canciller
+            await updateDocument("partidas", props.codigoSala, {
+              fase: yesVotes > noVotes ? "Legislacion" : "seleccion_presidente",
+              id_canciller: yesVotes > noVotes ? currentChancellor.value.id : null,
+              id_canciller_anterior: yesVotes > noVotes ? currentChancellor.value.id : null,
+              id_presidente_anterior:yesVotes > noVotes ? currentPresident.value.id : null,
+            });
+
 
             // Actualizar el estado de la votación
             await updateVotacion(props.codigoSala, votacionActiva, {
@@ -362,14 +371,11 @@ export default {
               votos_nein: noVotes
             });
 
-            // Actualizar la fase y el canciller
             await updateDocument("partidas", props.codigoSala, {
-              fase: yesVotes > noVotes ? "Legislacion" : "seleccion_presidente",
-              id_canciller: yesVotes > noVotes ? currentChancellor.value.id : null,
-              votacion_activa: null,
-              id_canciller_anterior: yesVotes > noVotes ? currentChancellor.value.id : null,
-              id_presidente_anterior:yesVotes > noVotes ? currentPresident.value.id : null,
+              votacion_activa: null,  
             });
+
+            
 
             if (yesVotes > noVotes) {
               // El canciller fue aprobado
@@ -393,7 +399,7 @@ export default {
               };
 
               // Reiniciar el proceso
-              currentChancellor.value = null;
+              
               electionTracker.value++;
               
               if (electionTracker.value >= 3) {
@@ -516,7 +522,6 @@ export default {
 
         // Actualizar la fase de la partida
         await updateDocument("partidas", props.codigoSala, {
-          fase: "seleccion_presidente",
           politicas_seleccionadas: politicasSeleccionadas.map(p => p.id)
         });
 
