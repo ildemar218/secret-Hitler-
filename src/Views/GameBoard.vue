@@ -9,6 +9,37 @@
       :type="notification.type"
     />
 
+    <div v-if="showPowerModal" class="power-modal-container">
+      <PowerModal
+        :visible="showPowerModal"
+        :power="selectedPower"
+        :players="players"
+        :selectedPlayer="selectedPlayer"
+        :president="currentPresident"
+        :chancellor="currentChancellor"
+        :currentPlayer="currentPlayer"
+        @close="closePowerModal"
+        @confirm="handleConfirm"
+        @select="handleSelect"
+      />
+    </div>
+
+    <div v-if="showConfirmPolicyModal" @close="closePolicyModal" class="confirmpolicy-container">
+      <ConfirmPolicy 
+      :policy="promulgatedPolicy"
+      @confirm="handleConfirmPolicy"
+      />
+    </div>
+
+    <div v-if="showGameEndModal" @close="closeGameEnd" class="game-end-container">
+      <GameEndModal 
+      :winner="winner"
+      :condition="victoryCondition"
+      :players="players"
+      @confirm="handleGameEndConfirm"
+      />
+    </div>
+
     <!-- Área de Jugadores -->
     <PlayersArea
       :players="players"
@@ -96,6 +127,9 @@ import {
   updateVotacion, 
   onVotosChange 
 } from "../firebase/servicesFirebase";
+import PowerModal from '../components/PowerModal.vue'
+import ConfirmPolicy from '../components/ConfirmPolicy.vue'
+import GameEndModal from '../components/GameEndModal.vue'
 
 export default {
   props: ["codigoSala"],
@@ -105,7 +139,12 @@ export default {
     PresidentCansillerSelector,
     PolicyArea,
     NextTurnButton,
-    VotingModal
+    VotingModal,
+    PowerModal,
+    NotificationArea,
+    PolicyArea,
+    ConfirmPolicy,
+    GameEndModal,
   },
   setup(props) {
     const notification = ref({ 
@@ -128,6 +167,15 @@ export default {
     const showVotingModal = ref(false);
     const votingPhase = ref(false);
     const gameResult = ref(null);
+    const showPowerModal = ref(false);
+    const selectedPower = ref(''); //'execution', 'identity', 'next-president', 'veto-chancellor', 'veto-president', 'alert'
+    const selectedPlayer = ref(null);
+    const currentPlayer = ref(currentUser); // ya debes tener esto
+    const showConfirmPolicyModal = ref(false);
+    const promulgatedPolicy = ref('fascist'); // 'fascist' o 'liberal'
+    const showGameEndModal = ref(true);
+    const winner = ref('fascist'); // 'fascist' o 'liberal'
+    const victoryCondition = ref('hitler-elected'); // 'hitler-elected', 'fascist-policies', etc.
 
     // Escuchar jugadores en tiempo real y sincronizar estado local con Firebase
     onMounted(async () => {
@@ -527,7 +575,69 @@ export default {
       }
     };
 
+    function openPowerModal(powerType) {
+      selectedPower.value = powerType
+      showPowerModal.value = true
+    }
+
+    function closePowerModal() {
+      showPowerModal.value = false
+      selectedPower.value = ''
+      selectedPlayer.value = null
+    }
+
+    function handleSelect(player) {
+      selectedPlayer.value = player
+    }
+
+    function handleConfirm(payload) {
+      // Aquí ejecutas la acción según el poder.
+      if (selectedPower.value === 'execution') {
+        // Ejecutar jugador
+        ejecutarJugador(payload.id)
+      } else if (selectedPower.value === 'identity') {
+        revelarRol(payload.id)
+      } // etc.
+
+      closePowerModal()
+    }
+
+    function openPolicyModal(policy) {
+      promulgatedPolicy.value = policy
+      showConfirmPolicyModal.value = true
+    }
+
+    function closePolicyModal() {
+      showConfirmPolicyModal.value = false
+    }
+
+    function handleConfirmPolicy() {
+      closePolicyModal()
+    }
+
+    function endGame(winningTeam, condition) {
+      winner.value = winningTeam
+      victoryCondition.value = condition
+      showGameEndModal.value = true
+    }
+
+    function closeGameEnd() {
+      showGameEndModal.value = false
+    }
+
+    function handleGameEndConfirm() {
+      closeGameEnd()
+      // Aquí podrías reiniciar el juego o redirigir a otra pantalla
+    }
+
     return {
+      showPowerModal,
+      selectedPower,
+      selectedPlayer,
+      currentPlayer,
+      closePowerModal,
+      handleSelect,
+      handleConfirm,
       notification,
       players,
       showChancellorSelector,
@@ -550,7 +660,18 @@ export default {
       handleTurnChanged,
       resetGame,
       startGame,
-      drawPolicies
+      drawPolicies,
+      openPolicyModal,
+      closePolicyModal,
+      showConfirmPolicyModal,
+      promulgatedPolicy,
+      handleConfirmPolicy,
+      showGameEndModal,
+      closeGameEnd,
+      endGame,
+      handleGameEndConfirm,
+      winner,
+      victoryCondition,
     };
   },
 };
@@ -573,5 +694,27 @@ export default {
   background-color: #f8f9fa;
   border-radius: 8px;
   margin-top: 2rem;
+}
+
+.confirmpolicy-container{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  z-index: 50;
+  width: 80%;
+  max-width: 700px;
+  box-shadow: 00 10px rgba(0, 0, 0, 0.3);
+}
+
+.game-end-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  z-index: 50;
+  width: 80%;
+  max-width: 700px;
+  box-shadow: 00 10px rgba(0, 0, 0, 0.3);
 }
 </style>
