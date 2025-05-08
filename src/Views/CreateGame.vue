@@ -16,7 +16,7 @@
           :key="index"
           class="list-group-item"
         >
-          {{ jugador.nombre }}
+          {{ jugador.nombreEnJuego }}
         </div>
       </div>
 
@@ -29,7 +29,7 @@
       </router-link>
 
       <!-- Botón para volver -->
-      <router-link to="/home">
+      <router-link to="/">
         <button class="btn btn-danger w-100">Volver</button>
       </router-link>
     </div>
@@ -40,8 +40,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { AuthService } from '../firebase/auth.js';
-import { createDocument, readDocumentById, updateDocument, createSubCollection, onSnapshotDocument, onSnapshotSubcollectionWithFullData, readCollection, createGame } from "../firebase/servicesFirebase.js";
-import { initializePolicies } from "../firebase/initializePolicies";
+import { createGame, startGame, onGameStateChange, onPlayersChange } from "../firebase/servicesFirebase.js";
 import Swal from "sweetalert2";
 
 export default {
@@ -50,86 +49,34 @@ export default {
     const participantes = ref([]);
     const estado = ref("esperando");
     const router = useRouter();
-    let uid = ""; // Declarar uid en el alcance del componente
+    let unsubscribeGame = null;
+    let unsubscribePlayers = null;
 
-    const generarCodigo = () => {
-      const caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-      let codigo = "";
-      for (let i = 0; i < 5; i++) {
-        const indiceAleatorio = Math.floor(Math.random() * caracteres.length);
-        codigo += caracteres.charAt(indiceAleatorio);
-      }
-      return codigo;
-    };
-
-    let unsubscribeDocumento = null;
-    let unsubscribeSubcoleccion = null;
     onMounted(async () => {
       const user = await AuthService.getCurrentUser();
-      console.log(user);
       if (!user) {
         Swal.fire("Error", "Debes iniciar sesión para crear una partida.", "error");
         return;
       }
 
-      const { displayName, uid: userUid } = user; // Obtener uid del usuario autenticado
-      uid = userUid; // Asignar uid al alcance del componente
-      console.log(displayName, uid);
-      let nuevoCodigo;
-      let partidaSnap;
-
       try {
-        // Verifica y genera un código único
-        do {
-          nuevoCodigo = generarCodigo(); // Generar un nuevo código
-          partidaSnap = await readDocumentById("partidas", nuevoCodigo);
-        } while (partidaSnap); // Repetir mientras el código ya exista
+        // Crear nueva partida
+        const gameCode = await createGame(user);
+        codigo.value = gameCode;
 
-        // Crea la nueva partida
-        await createDocument(
-          "partidas",
-          {
-            codigo: nuevoCodigo,
-            estado: "esperando",
-            turnoActual: uid, // Revisar si este o el jugadores_partida
-            cartaActual: "inicio",
-            colorActual: "ninguno",
-            cartaAcumulada: null,
-            ordenInverso: false,
-          },
-          nuevoCodigo
-        );
-
-        // Añadir el jugador a "jugadores_partida"
-        await createSubCollection("partidas", nuevoCodigo, "jugadores_partida", {
-          idJugador: uid,
-          idPartida: nuevoCodigo,
-          host: true,
-          estadoUno: false,
+        // Escuchar cambios en los jugadores
+        unsubscribePlayers = onPlayersChange(gameCode, (players) => {
+          participantes.value = players;
         });
 
-        // Asignar valores locales
-        codigo.value = nuevoCodigo;
-        estado.value = "No iniciada";
-
-        // Escuchar cambios en la subcolección "jugadores_partida"
-        unsubscribeSubcoleccion = await onSnapshotSubcollectionWithFullData(
-          "partidas",
-          codigo.value,
-          "jugadores_partida",
-          (querySnapshot) => {
-            participantes.value = querySnapshot;
-          }
-        );
-
-        // Escuchar cambios en la partida
-        unsubscribeDocumento = await onSnapshotDocument("partidas", codigo.value, (docSnap) => {
-          if (docSnap) {
-            if (docSnap.estado === "iniciada") {
-              router.push(`/gameboard/${codigo.value}`);
-            }
+        // Escuchar cambios en el estado de la partida
+        unsubscribeGame = onGameStateChange(gameCode, (gameData) => {
+          estado.value = gameData.estado;
+          if (gameData.estado === "iniciada") {
+            router.push(`/gameboard/${gameCode}`);
           }
         });
+
       } catch (error) {
         console.error("Error al crear la partida:", error);
         Swal.fire("Error", "No se pudo crear la partida. Inténtalo de nuevo.", "error");
@@ -138,32 +85,19 @@ export default {
 
     const iniciarPartida = async () => {
       try {
-        // Verificar que haya al menos 5 jugadores
         if (participantes.value.length < 5) {
           Swal.fire("Error", "Se necesitan al menos 5 jugadores para iniciar la partida.", "error");
           return;
         }
 
-        const jugadores = participantes.value.map((jugador, index) => ({
-          id_usuario: jugador.idJugador,
-          id_jugador: jugador.idJugador,
-          nombre: jugador.nombre,
-          rol: index === 0 ? "hitler" : index % 2 === 0 ? "fascista" : "liberal", // Asignar roles
-          orden_turno: index + 1,
+        // Asegurarse de que todos los jugadores tengan los campos necesarios
+        const jugadoresPreparados = participantes.value.map(jugador => ({
+          idJugador: jugador.idJugador,
+          nombreEnJuego: jugador.nombreEnJuego,
+          esHost: jugador.esHost || false
         }));
 
-        // Crear la partida
-        await createGame(codigo.value, uid, jugadores);
-
-        // Inicializar las políticas
-        await initializePolicies(codigo.value);
-
-        // Actualizar el estado de la partida a "iniciada"
-        await updateDocument("partidas", codigo.value, { estado: "iniciada" });
-
-        // Redirigir al tablero de juego
-        router.push({ name: 'GameBoard', params: { codigoSala: codigo.value } });
-
+        await startGame(codigo.value, jugadoresPreparados[0].idJugador, jugadoresPreparados);
         Swal.fire("¡Partida iniciada!", "La partida ha comenzado correctamente.", "success");
       } catch (error) {
         console.error("Error al iniciar la partida:", error);
@@ -171,22 +105,9 @@ export default {
       }
     };
 
-    const updateTurn = async (turnoActual) => {
-      try {
-        await updateDocument("partidas", props.codigoSala, { turno_actual: turnoActual });
-        console.log("Turno actualizado:", turnoActual);
-      } catch (error) {
-        console.error("Error al actualizar el turno:", error);
-      }
-    };
-
     onUnmounted(() => {
-      if (unsubscribeDocumento) {
-        unsubscribeDocumento();
-      }
-      if (unsubscribeSubcoleccion) {
-        unsubscribeSubcoleccion();
-      }
+      if (unsubscribeGame) unsubscribeGame();
+      if (unsubscribePlayers) unsubscribePlayers();
     });
 
     return { codigo, participantes, estado, iniciarPartida };
