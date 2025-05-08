@@ -11,10 +11,11 @@
 
     <!-- Área de Jugadores -->
     <PlayersArea
-      :players="players"
-      :current-president="currentPresident"
-      :current-chancellor="currentChancellor"
-    />
+  :players="players"
+  :current-president="currentPresident"
+  :current-chancellor="currentChancellor"
+  :current-user="currentUser"
+/>
 
     <!-- Contenedor de Mazos -->
     <div class="decks-container mb-4">
@@ -133,10 +134,11 @@ export default {
     onMounted(async () => {
       try {
         const user = await AuthService.getCurrentUser();
+        console.log("[Usuario autenticado]", user);
         if (user) {
           currentUser.value = { 
             id: user.uid, 
-            name: user.displayName 
+            nombre: user.displayName 
           };
           console.log("Usuario actual:", currentUser.value);
         }

@@ -1,12 +1,13 @@
 <template>
   <div class="players-container mb-4">
-    <div v-if="players.length > 0" class="d-flex justify-content-center">
+    <div v-if="players.length > 0" class="d-flex justify-content-center flex-wrap">
       <PlayerContainer
         v-for="player in players"
         :key="player.id"
         :nombre="player.nombre"
         :rol="getPlayerRole(player)"
         :imagen="player.imagen"
+        :cargo="getCargo(player)"
       />
     </div>
     <div v-else>
@@ -35,17 +36,47 @@ export default {
     currentChancellor: {
       type: Object,
       default: null
+    },
+    currentUser: {
+      type: Object,
+      required: false,
+      default: null
     }
   },
   setup(props) {
-    const getPlayerRole = (player) => {
-      if (player.id === props.currentPresident?.id) return 'presidente';
-      if (player.id === props.currentChancellor?.id) return 'canciller';
-      return player.rol;
-    };
+
+    const getCargo = (player) => {
+  if (player.id === props.currentPresident?.id) return 'presidente';
+  if (player.id === props.currentChancellor?.id) return 'canciller';
+  return null;
+};
+
+const getPlayerRole = (player) => {
+  const currentUser = props.currentUser;
+  if (!currentUser || !player) return ' ';
+
+  const isMe = player.id === currentUser.id;
+  if (isMe) return player.rol;
+
+  const myPlayer = props.players.find(p => p.id === currentUser.id);
+  if (!myPlayer) return ' ';
+
+  if (myPlayer.rol === 'liberal') return ' ';
+  if (myPlayer.rol === 'fascista') {
+    return (player.rol === 'fascista' || player.rol === 'hitler') ? player.rol : ' ';
+  }
+  if (myPlayer.rol === 'hitler') {
+    return player.rol === 'fascista' ? 'fascista' : ' ';
+  }
+
+  return ' ';
+};
+
+
 
     return {
-      getPlayerRole
+      getPlayerRole,
+      getCargo
     };
   }
 };

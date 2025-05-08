@@ -1,12 +1,15 @@
 <template>
-  <div class="player-card">
-    <div v-if="rol === 'canciller'" class="role-badge chancellor-badge">
+  <div class="player-card" :class="{ 'my-player': isCurrentPlayer }">
+    <div v-if="cargo === 'canciller'" class="role-badge chancellor-badge">
       Canciller
+    </div>
+    <div v-if="cargo === 'presidente'" class="role-badge president-badge">
+      Presidente
     </div>
     <img :src="imagen" alt="Imagen del jugador" class="player-image" />
     <div class="player-name">{{ nombre }}</div>
     <div class="player-role">
-      {{ rol === 'presidente' ? 'Presidente' : rol }}
+      {{ rol === 'desconocido' ? 'Rol desconocido' : capitalize(rol) }}
     </div>
   </div>
 </template>
@@ -19,14 +22,20 @@ defineProps({
   },
   rol: {
     type: String,
-    required: true,
+    required: false,
   },
   imagen: {
     type: String,
     required: true,
   },
+  cargo: String
 });
+
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+
 </script>
+
 
 <style scoped>
 .player-card {
@@ -55,6 +64,13 @@ defineProps({
 
 .chancellor-badge {
   background-color: #ffc107;
+  color: #000;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.president-badge {
+  background-color: #07ff28;
   color: #000;
   border: 2px solid #fff;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
