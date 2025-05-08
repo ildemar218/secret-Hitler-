@@ -48,7 +48,7 @@
     />
 
     <!-- Botón de Robar Políticas -->
-    <div v-if="partida?.fase === 'seleccion_politicas' && currentUser?.id === currentPresident?.id" class="mt-4">
+    <div v-if="partida?.fase === 'Legislacion' && currentUser?.id === currentPresident?.id" class="mt-4">
       <button class="btn btn-primary" @click="drawPolicies">
         Robar 3 Cartas
       </button>
@@ -195,7 +195,7 @@ export default {
             // Ocultar el modal y limpiar el estado cuando no estamos en fase de votación
             showVotingModal.value = false;
             votingPhase.value = false;
-            if (partidaData.fase !== "seleccion_politicas") {
+            if (partidaData.fase !== "Legislacion") {
               currentChancellor.value = null;
             }
           }
@@ -238,8 +238,11 @@ export default {
               votingPhase.value = true;
               currentChancellor.value = players.value.find(p => p.id === votacionActiva.candidato_id);
             } else {
+              
               showVotingModal.value = false;
-              votingPhase.value = false;
+      votingPhase.value = false;
+
+    
             }
           }
         );
@@ -316,6 +319,7 @@ export default {
 
         // Obtener la votación activa
         const votacionActiva = partida.value.votacion_activa;
+        console.log("Votacion activa", votacionActiva)
         if (!votacionActiva) {
           throw new Error("No hay votación activa");
         }
@@ -359,17 +363,22 @@ export default {
 
             // Actualizar la fase y el canciller
             await updateDocument("partidas", props.codigoSala, {
-              fase: yesVotes > noVotes ? "seleccion_politicas" : "seleccion_presidente",
+              fase: yesVotes > noVotes ? "Legislacion" : "seleccion_presidente",
               id_canciller: yesVotes > noVotes ? currentChancellor.value.id : null,
               votacion_activa: null
             });
 
             if (yesVotes > noVotes) {
               // El canciller fue aprobado
-              notification.value = {
-                message: "¡El Canciller ha sido aprobado!",
-                type: "success"
-              };
+              const esPresidente = currentUser.value?.id === currentPresident.value?.id;
+
+  if (esPresidente) {
+    notification.value = {
+      message: "Selección de políticas: fase de legislación",
+      type: "info"
+    };
+    console.log("[🗳️ Legislación] Presidente actual selecciona políticas");
+  } 
 
               // Iniciar la selección de políticas
               drawPolicies();
@@ -508,10 +517,6 @@ export default {
           politicas_seleccionadas: politicasSeleccionadas.map(p => p.id)
         });
 
-        notification.value = {
-          message: "Has robado 3 cartas. Selecciona 2 para el canciller.",
-          type: "info"
-        };
 
       } catch (error) {
         console.error("Error al robar políticas:", error);
