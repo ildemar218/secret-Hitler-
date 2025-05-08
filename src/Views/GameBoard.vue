@@ -31,6 +31,15 @@
       />
     </div>
 
+    <div v-if="showGameEndModal" @close="closeGameEnd" class="game-end-container">
+      <GameEndModal 
+      :winner="winner"
+      :condition="victoryCondition"
+      :players="players"
+      @confirm="handleGameEndConfirm"
+      />
+    </div>
+
     <!-- Contenedor de Jugadores -->
     <div class="players-container mb-4">
       <div v-if="players.length > 0">
@@ -128,6 +137,7 @@ import { AuthService } from '../firebase/auth.js';
 import { writeBatch, doc } from "firebase/firestore";
 import PowerModal from '../components/PowerModal.vue'
 import ConfirmPolicy from '../components/ConfirmPolicy.vue'
+import GameEndModal from '../components/GameEndModal.vue'
 
 export default {
   props: ["codigoSala"],
@@ -140,7 +150,8 @@ export default {
     PowerModal,
     NotificationArea,
     PolicyArea,
-    ConfirmPolicy
+    ConfirmPolicy,
+    GameEndModal
   },
   setup(props) {
     const notification = ref({ message: "", type: "" });
@@ -165,6 +176,10 @@ export default {
     const currentPlayer = ref(currentUser) // ya debes tener esto
     const showConfirmPolicyModal = ref(false)
     const promulgatedPolicy = ref('fascist') // 'fascist' o 'liberal'
+    const showGameEndModal = ref(true)
+    const winner = ref('fascist') // 'fascist' o 'liberal'
+    const victoryCondition = ref('hitler-elected') // 'hitler-elected', 'fascist-policies', etc.
+
     // Escuchar jugadores en tiempo real y sincronizar estado local con Firebase
     onMounted(async () => {
       try {
@@ -651,6 +666,21 @@ export default {
       closePolicyModal()
     }
 
+    function endGame(winningTeam, condition) {
+      winner.value = winningTeam
+      victoryCondition.value = condition
+      showGameEndModal.value = true
+    }
+
+    function closeGameEnd() {
+      showGameEndModal.value = false
+    }
+
+    function handleGameEndConfirm() {
+      closeGameEnd()
+      // Aquí podrías reiniciar el juego o redirigir a otra pantalla
+    }
+
     if (electionTracker < 0 || electionTracker > 3) {
       console.error("Valor inválido para electionTracker:", electionTracker);
     }
@@ -702,7 +732,13 @@ export default {
       closePolicyModal,
       showConfirmPolicyModal,
       promulgatedPolicy,
-      handleConfirmPolicy
+      handleConfirmPolicy,
+      showGameEndModal,
+      closeGameEnd,
+      endGame,
+      handleGameEndConfirm,
+      winner,
+      victoryCondition
     };
   },
 };
@@ -839,6 +875,17 @@ export default {
 }
 
 .confirmpolicy-container{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  z-index: 50;
+  width: 80%;
+  max-width: 700px;
+  box-shadow: 00 10px rgba(0, 0, 0, 0.3);
+}
+
+.game-end-container {
   position: absolute;
   top: 50%;
   left: 50%;
