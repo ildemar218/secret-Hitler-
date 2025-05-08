@@ -6,6 +6,7 @@ import PresidentCansillerSelector from "../components/PresidentCansillerSelector
 import JoinGame from "../Views/JoinGame.vue";
 import CreateGame from "../Views/CreateGame.vue";
 import LandingPage from "../Views/LandingPage.vue";
+//la importacion de la alertarole para agregar la ruta del componente 
 import AlertRole from "../components/AlertRole.vue";
 
 const routes = [
@@ -20,6 +21,7 @@ const routes = [
   { path: "/", name: "register", component: Register },
   { path: "/join-game", name: "join-game", component: JoinGame },
   { path: "/create-game", name: "create-game", component: CreateGame },
+  //la ruta para que se vea el alert por aparte en alerrtroles
   { path: "/alert-rol", name: "alert-rol", component: AlertRole },
 ];
 
